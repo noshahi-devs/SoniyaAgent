@@ -1,19 +1,32 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
-import { useState } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 const VoiceHandler = ({ onSpeechResult }) => {
     const [isListening, setIsListening] = useState(false);
+    const pulseAnim = useRef(new Animated.Value(1)).current;
 
-    // Jab Speech khatam ho jaye aur result aaye
+    useEffect(() => {
+        if (isListening) {
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(pulseAnim, { toValue: 1.2, duration: 600, useNativeDriver: true }),
+                    Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+                ])
+            ).start();
+        } else {
+            pulseAnim.setValue(1);
+        }
+    }, [isListening]);
+
     useSpeechRecognitionEvent("result", (event) => {
         const transcript = event.results[0]?.transcript;
         if (transcript) {
-            onSpeechResult(transcript); // Soniya ko bhejo
+            onSpeechResult(transcript);
         }
     });
 
-    // Jab bolna band karein
     useSpeechRecognitionEvent("end", () => {
         setIsListening(false);
     });
@@ -27,7 +40,7 @@ const VoiceHandler = ({ onSpeechResult }) => {
 
         setIsListening(true);
         ExpoSpeechRecognitionModule.start({
-            lang: "en-US", // Aap "ur-PK" bhi kar sakte hain
+            lang: "en-US",
             interimResults: false,
         });
     };
@@ -38,23 +51,47 @@ const VoiceHandler = ({ onSpeechResult }) => {
     };
 
     return (
-        <TouchableOpacity
-            style={[styles.btn, isListening ? styles.listening : styles.idle]}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-        >
-            <Text style={styles.btnText}>
-                {isListening ? "Soniya Sun Rahi Hai..." : "Daba kar Rakhein aur Bolein"}
-            </Text>
-        </TouchableOpacity>
+        <View style={styles.container}>
+            <Animated.View style={[styles.pulseShadow, { transform: [{ scale: pulseAnim }], opacity: isListening ? 0.3 : 0 }]} />
+            <TouchableOpacity
+                activeOpacity={0.8}
+                onPressIn={handlePressIn}
+                onPressOut={handlePressOut}
+            >
+                <LinearGradient
+                    colors={isListening ? ['#ff4081', '#ff1493'] : ['#ff69b4', '#db7093']}
+                    style={styles.btn}
+                >
+                    <Text style={styles.btnText}>
+                        {isListening ? "LISENING..." : "HOLD TO SPEAK"}
+                    </Text>
+                </LinearGradient>
+            </TouchableOpacity>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
-    btn: { padding: 20, borderRadius: 50, alignItems: 'center', marginVertical: 20, marginHorizontal: 40 },
-    idle: { backgroundColor: '#ff69b4' },
-    listening: { backgroundColor: '#ff4081', transform: [{ scale: 1.1 }] },
-    btnText: { color: 'white', fontWeight: 'bold', fontSize: 16 }
+    container: { alignItems: 'center', justifyContent: 'center' },
+    pulseShadow: {
+        position: 'absolute',
+        width: 280,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: '#ff69b4',
+    },
+    btn: {
+        paddingVertical: 18,
+        paddingHorizontal: 45,
+        borderRadius: 40,
+        alignItems: 'center',
+        shadowColor: '#ff69b4',
+        shadowOffset: { width: 0, height: 10 },
+        shadowRadius: 15,
+        shadowOpacity: 0.4,
+        elevation: 10,
+    },
+    btnText: { color: 'white', fontWeight: '900', fontSize: 16, letterSpacing: 2 }
 });
 
 export default VoiceHandler;

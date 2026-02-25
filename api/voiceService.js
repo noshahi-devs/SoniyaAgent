@@ -1,19 +1,31 @@
 import * as Haptics from 'expo-haptics';
-import Tts from 'react-native-tts';
+import * as Speech from 'expo-speech';
 
 export const initSoniyaVoice = () => {
-    Tts.getInitStatus().then(() => {
-        Tts.setDefaultLanguage('en-IN');
-        Tts.setDefaultRate(0.45, true);
-        Tts.setDefaultPitch(1.1);
-    });
+    // expo-speech doesn't require explicit init, but we can check available voices if needed
+    console.log("Soniya Voice Initialized");
 };
 
-export const soniyaSpeak = (text) => {
+export const soniyaSpeak = (text, onStart, onEnd) => {
     if (text) {
-        Tts.stop();
+        Speech.stop();
         // Bolne se pehle ek halka sa vibration
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Tts.speak(text);
+
+        Speech.speak(text, {
+            language: 'en-IN',
+            pitch: 1.1,
+            rate: 1.0,
+            onStart: () => {
+                if (onStart) onStart();
+            },
+            onDone: () => {
+                if (onEnd) onEnd();
+            },
+            onError: (err) => {
+                console.log("Speech Error:", err);
+                if (onEnd) onEnd();
+            }
+        });
     }
 };

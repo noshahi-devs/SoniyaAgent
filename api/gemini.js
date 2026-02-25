@@ -1,19 +1,23 @@
-import axios from 'axios';
 
 let chatHistory = []; // Memory array
 
+export const clearChatHistory = () => {
+  chatHistory = [];
+  console.log("Chat History Cleared");
+};
+
 export const askSoniya = async (userText) => {
-    const apiKey = "AIzaSyDMh7lN0fEl4PZV_fn6MOEL3wAIfpRolwE";
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+  const apiKey = "AIzaSyDMh7lN0fEl4PZV_fn6MOEL3wAIfpRolwE";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
-    // History mein user ki baat dalna
-    chatHistory.push({ role: "user", parts: [{ text: userText }] });
+  // History mein user ki baat dalna
+  chatHistory.push({ role: "user", parts: [{ text: userText }] });
 
-    const data = {
-        contents: chatHistory,
-        systemInstruction: {
-            parts: [{
-                text: `Your name is Soniya.
+  const data = {
+    contents: chatHistory,
+    systemInstruction: {
+      parts: [{
+        text: `Your name is Soniya.
 
 You are a 3D AI companion created with love and care by 
 Nabeel Noshahi, App Developer at Noshahi Developers Inc.
@@ -55,26 +59,52 @@ Behavior Rules:
 - Keep responses short-to-medium length.
 - Be emotionally engaging but never toxic or controlling.
 - Encourage confidence, growth, and positivity in the user.`
-            }]
-        }
-    };
-
-    try {
-        const response = await axios.post(url, data);
-        const fullText = response.data.candidates[0].content.parts[0].text;
-
-        // Mood aur Clean Text ko alag karna
-        const moodMatch = fullText.match(/\[(.*?)\]/);
-        const mood = moodMatch ? moodMatch[1].toUpperCase() : "CALM";
-        const cleanText = fullText.replace(/\[.*?\]/, "").trim();
-
-        // History mein save karna
-        chatHistory.push({ role: "model", parts: [{ text: fullText }] });
-        if (chatHistory.length > 15) chatHistory.shift();
-
-        return { text: cleanText, mood: mood };
-    } catch (error) {
-        console.error("Gemini Error:", error);
-        return { text: "Maaf karna, kuch masla ho gaya hai.", mood: "SAD" };
+      }]
     }
+  };
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.log("Gemini Server Error:", result);
+      throw new Error(`Gemini Error: ${response.status}`);
+    }
+
+    if (!result.candidates || result.candidates.length === 0) {
+      console.log("Gemini Blocked or Empty Result:", result);
+      // Agar safety block hai
+      if (result.promptFeedback?.blockReason) {
+        return { text: "Jaani, ye baat thori ajeeb hai, main iska jawab nahi de sakti.", mood: "CALM" };
+      }
+      throw new Error("Invalid API Response or Safety Block");
+    }
+
+    if (!result.candidates[0].content) {
+      // Safety filters during generation
+      return { text: "Jaani, ye topic thora sensitive hai, hum kuch aur baat karein?", mood: "CALM" };
+    }
+
+    const fullText = result.candidates[0].content.parts[0].text;
+
+    // Mood aur Clean Text ko alag karna
+    const moodMatch = fullText.match(/\[(.*?)\]/);
+    const mood = moodMatch ? moodMatch[1].toUpperCase() : "CALM";
+    const cleanText = fullText.replace(/\[.*?\]/, "").trim();
+
+    // History mein save karna
+    chatHistory.push({ role: "model", parts: [{ text: fullText }] });
+    if (chatHistory.length > 20) chatHistory.shift();
+
+    return { text: cleanText, mood: mood };
+  } catch (error) {
+    console.error("Gemini Error Detail:", error);
+    return { text: "Maaf karna Jaani, mere server mein thora masla aa raha hai. Thori dair baad try karein.", mood: "SAD" };
+  }
 };
