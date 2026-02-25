@@ -1,8 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef } from 'react';
-import { Animated, Dimensions, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Animated, Dimensions, ImageBackground, StatusBar, StyleSheet, Text, View } from 'react-native';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
+const SPLASH_IMAGE = require('../assets/images/splash-icon.png');
 
 const SplashScreen = ({ onFinish }) => {
     const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -34,10 +35,12 @@ const SplashScreen = ({ onFinish }) => {
     return (
         <View style={styles.container}>
             <StatusBar hidden />
-            <LinearGradient
-                colors={['#050111', '#4b0082', '#000']}
-                style={StyleSheet.absoluteFill}
-            />
+            <ImageBackground source={SPLASH_IMAGE} style={styles.bgImage} resizeMode="cover">
+                <LinearGradient
+                    colors={['rgba(5,1,17,0.35)', 'rgba(3,0,12,0.55)', 'rgba(0,0,0,0.7)']}
+                    style={StyleSheet.absoluteFill}
+                />
+            </ImageBackground>
 
             <Animated.View style={[styles.ring, { transform: [{ rotate: spin }] }]} />
             <Animated.View style={[styles.ring, styles.ring2, { transform: [{ rotate: '-45deg' }, { scale: 1.2 }] }]} />
@@ -56,6 +59,7 @@ const SplashScreen = ({ onFinish }) => {
 
 const styles = StyleSheet.create({
     container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' },
+    bgImage: { ...StyleSheet.absoluteFillObject },
     ring: {
         position: 'absolute',
         width: width * 0.8,

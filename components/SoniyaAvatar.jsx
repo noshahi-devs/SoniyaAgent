@@ -9,11 +9,11 @@ const SoniyaAvatar = ({ mood, isSpeaking, viewType = 'FULL' }) => {
     const lipsingInterval = useRef(null);
 
     useEffect(() => {
-        // Floating loop - starts at 0 and goes UP, so it touches bottom at 0
+        // Gentle idle float while staying bottom-anchored.
         Animated.loop(
             Animated.sequence([
-                Animated.timing(floatAnim, { toValue: -15, duration: 3000, useNativeDriver: true }),
-                Animated.timing(floatAnim, { toValue: 0, duration: 3000, useNativeDriver: true }),
+                Animated.timing(floatAnim, { toValue: -10, duration: 3600, useNativeDriver: true }),
+                Animated.timing(floatAnim, { toValue: 0, duration: 3600, useNativeDriver: true }),
             ])
         ).start();
 
@@ -24,31 +24,38 @@ const SoniyaAvatar = ({ mood, isSpeaking, viewType = 'FULL' }) => {
 
     useEffect(() => {
         if (isSpeaking) {
-            // Talking animation (Scale pulse + Zoom Forward)
+            // Slow and natural speech pulse.
             Animated.parallel([
                 Animated.loop(
                     Animated.sequence([
-                        Animated.timing(scaleAnim, { toValue: 1.15, duration: 250, useNativeDriver: true }),
-                        Animated.timing(scaleAnim, { toValue: 1.1, duration: 250, useNativeDriver: true }),
+                        Animated.timing(scaleAnim, { toValue: 1.06, duration: 420, useNativeDriver: true }),
+                        Animated.timing(scaleAnim, { toValue: 1.02, duration: 420, useNativeDriver: true }),
                     ])
                 ),
-                Animated.timing(floatAnim, { toValue: -30, duration: 300, useNativeDriver: true })
+                Animated.timing(floatAnim, { toValue: -14, duration: 450, useNativeDriver: true })
             ]).start();
 
             // Lipsing Cycle
             lipsingInterval.current = setInterval(() => {
                 setCurrentFrame(prev => (prev + 1) % 3);
-            }, 120);
+            }, 180);
         } else {
             if (lipsingInterval.current) clearInterval(lipsingInterval.current);
             setCurrentFrame(0);
             scaleAnim.stopAnimation();
             Animated.parallel([
-                Animated.spring(scaleAnim, { toValue: 1, friction: 5, useNativeDriver: true }),
-                Animated.spring(floatAnim, { toValue: 0, friction: 5, useNativeDriver: true })
+                Animated.spring(scaleAnim, { toValue: 1, friction: 7, tension: 35, useNativeDriver: true }),
+                Animated.spring(floatAnim, { toValue: 0, friction: 8, tension: 35, useNativeDriver: true })
             ]).start();
         }
     }, [isSpeaking]);
+
+    const viewConfig = {
+        FULL: { width: 420, height: 620, yLift: -52 },
+        HALF: { width: 430, height: 600, yLift: -24 },
+        CLOSEUP: { width: 470, height: 620, yLift: 0 }
+    };
+    const activeView = viewConfig[viewType] || viewConfig.FULL;
 
     // Image Source Logic
     const getAvatarImage = () => {
@@ -70,8 +77,11 @@ const SoniyaAvatar = ({ mood, isSpeaking, viewType = 'FULL' }) => {
                     source={getAvatarImage()}
                     style={[
                         styles.character,
-                        viewType === 'HALF' && styles.halfBody,
-                        viewType === 'CLOSEUP' && styles.closeupBody
+                        {
+                            width: activeView.width,
+                            height: activeView.height,
+                            marginBottom: activeView.yLift
+                        }
                     ]}
                     resizeMode="contain"
                 />
@@ -81,10 +91,8 @@ const SoniyaAvatar = ({ mood, isSpeaking, viewType = 'FULL' }) => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, justifyContent: 'flex-end', alignItems: 'center', width: '100%', overflow: 'hidden' },
-    character: { width: 450, height: 600, marginBottom: 0 },
-    halfBody: { width: 480, height: 620, marginBottom: 0 },
-    closeupBody: { width: 550, height: 700, marginBottom: 0 },
+    container: { flex: 1, justifyContent: 'flex-end', alignItems: 'center', width: '100%', overflow: 'visible' },
+    character: { width: 420, height: 620 },
 });
 
 export default SoniyaAvatar;

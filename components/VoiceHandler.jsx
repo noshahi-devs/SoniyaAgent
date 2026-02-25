@@ -3,9 +3,10 @@ import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-spe
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-const VoiceHandler = ({ onSpeechResult }) => {
+const VoiceHandler = ({ onSpeechResult, disabled = false }) => {
     const [isListening, setIsListening] = useState(false);
     const pulseAnim = useRef(new Animated.Value(1)).current;
+    const recognitionLangRef = useRef('ur-PK');
 
     useEffect(() => {
         if (isListening) {
@@ -21,6 +22,7 @@ const VoiceHandler = ({ onSpeechResult }) => {
     }, [isListening]);
 
     useSpeechRecognitionEvent("result", (event) => {
+        if (!isListening) return;
         const transcript = event.results[0]?.transcript;
         if (transcript) {
             onSpeechResult(transcript);
@@ -31,18 +33,41 @@ const VoiceHandler = ({ onSpeechResult }) => {
         setIsListening(false);
     });
 
+    const startRecognitionWithFallback = async () => {
+        const fallbackLangs = ['pa-PK', 'ur-PK', 'hi-IN', 'en-US'];
+
+        for (const lang of fallbackLangs) {
+            try {
+                await ExpoSpeechRecognitionModule.start({
+                    lang,
+                    interimResults: true,
+                    continuous: false,
+                });
+                recognitionLangRef.current = lang;
+                return true;
+            } catch (_err) {
+                // Try next language until one starts successfully.
+            }
+        }
+
+        return false;
+    };
+
     const handlePressIn = async () => {
+        if (disabled) return;
         const result = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
         if (!result.granted) {
             Alert.alert("Permission Required", "Soniya ko mic ki zaroorat hai.");
             return;
         }
 
+        const started = await startRecognitionWithFallback();
+        if (!started) {
+            Alert.alert("Mic Language Error", "Voice recognition start nahi ho saka. Dobara try karein.");
+            setIsListening(false);
+            return;
+        }
         setIsListening(true);
-        ExpoSpeechRecognitionModule.start({
-            lang: "en-US",
-            interimResults: false,
-        });
     };
 
     const handlePressOut = () => {
@@ -55,15 +80,18 @@ const VoiceHandler = ({ onSpeechResult }) => {
             <Animated.View style={[styles.pulseShadow, { transform: [{ scale: pulseAnim }], opacity: isListening ? 0.3 : 0 }]} />
             <TouchableOpacity
                 activeOpacity={0.8}
+                disabled={disabled}
                 onPressIn={handlePressIn}
                 onPressOut={handlePressOut}
             >
                 <LinearGradient
-                    colors={isListening ? ['#ff4081', '#ff1493'] : ['#ff69b4', '#db7093']}
+                    colors={disabled ? ['#64748b', '#475569'] : isListening ? ['#ff4081', '#ff1493'] : ['#ff69b4', '#db7093']}
                     style={styles.btn}
                 >
                     <Text style={styles.btnText}>
-                        {isListening ? "LISENING..." : "HOLD TO SPEAK"}
+                        {disabled
+                            ? "WAKE MODE ACTIVE"
+                            : isListening ? `LISTENING (${recognitionLangRef.current})...` : "HOLD TO SPEAK"}
                     </Text>
                 </LinearGradient>
             </TouchableOpacity>
