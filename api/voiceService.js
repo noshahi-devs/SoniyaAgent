@@ -13,9 +13,9 @@ export const soniyaSpeak = (text, onStart, onEnd) => {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
         Speech.speak(text, {
-            language: 'en-IN',
-            pitch: 1.1,
-            rate: 1.0,
+            language: 'hi-IN', // Hindi phonetics are perfect for Roman Urdu
+            pitch: 1.05,
+            rate: 0.95, // Slightly slower for better clarity and human feel
             onStart: () => {
                 if (onStart) onStart();
             },

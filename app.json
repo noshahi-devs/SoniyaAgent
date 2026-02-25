@@ -25,9 +25,6 @@
       "permissions": [
         "RECORD_AUDIO",
         "MODIFY_AUDIO_SETTINGS",
-        "android.permission.RECORD_AUDIO",
-        "RECORD_AUDIO",
-        "MODIFY_AUDIO_SETTINGS",
         "android.permission.RECORD_AUDIO"
       ],
       "edgeToEdgeEnabled": true,
@@ -36,15 +33,14 @@
       }
     },
     "web": {
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/android-icon-foreground.png"
     },
     "plugins": [
       [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
+          "resizeMode": "cover",
           "backgroundColor": "#000000"
         }
       ],
@@ -56,11 +52,9 @@
     },
     "extra": {
       "eas": {
-        "projectId": "8ff6606c-bea4-486b-99cf-d1267712241d"
+        "projectId": "4fecd7ce-e39d-4c9c-96c0-be4e81368f23"
       }
     },
-    "updates": {
-      "url": "https://u.expo.dev/8ff6606c-bea4-486b-99cf-d1267712241d"
-    }
+    "updates": {}
   }
 }
