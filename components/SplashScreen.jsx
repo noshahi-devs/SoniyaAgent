@@ -47,7 +47,7 @@ const SplashScreen = ({ onFinish }) => {
                 <Animated.View style={{ opacity: textFadeAnim }}>
                     <Text style={styles.pro}>PREMIUM AI VERSION</Text>
                     <View style={styles.line} />
-                    <Text style={styles.company}>NOSHAHI DEVELOPERS INC.</Text>
+                    <Text style={styles.company}>Noshahi Developers Inc.</Text>
                 </Animated.View>
             </Animated.View>
         </View>

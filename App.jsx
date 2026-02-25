@@ -2,14 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Updates from 'expo-updates';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
+    Animated,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     ScrollView,
     StatusBar,
     StyleSheet,
     Switch,
     Text,
+    TextInput,
     TouchableOpacity,
     View
 } from 'react-native';
@@ -22,7 +26,7 @@ import VoiceHandler from './components/VoiceHandler';
 
 export default function App() {
     const [isReady, setIsReady] = useState(false);
-    const [soniyaWords, setSoniyaWords] = useState("Soniya: Noshahi Developers ki janib se salaam...");
+    const [soniyaWords, setSoniyaWords] = useState("Soniya: Loading...");
     const [mood, setMood] = useState("CALM");
     const [isSpeaking, setIsSpeaking] = useState(false);
 
@@ -32,6 +36,23 @@ export default function App() {
     const [hapticsEnabled, setHapticsEnabled] = useState(true);
     const [midnightMode, setMidnightMode] = useState(false);
     const [viewType, setViewType] = useState('FULL'); // FULL, HALF, CLOSEUP
+    const [userInputText, setUserInputText] = useState('');
+
+    const greetings = [
+        "Soniya: Hello Jaani! Aaj hum kis baaray mein baat karein?",
+        "Soniya: Salaam! Main Soniya hoon, kaho kya haal hai?",
+        "Soniya: Noshahi Developers ki janib se salaam! Main haazir hoon.",
+        "Soniya: Hi! Aapki AI dost haazir hai, kuch help chahiye?",
+        "Soniya: Assalam-o-Alaikum! Kaho aaj kya naya seekhna hai?",
+        "Soniya: Hello! Soniya present hai, hukam karein mere dost!"
+    ];
+
+    useEffect(() => {
+        if (isReady) {
+            const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+            setSoniyaWords(randomGreeting);
+        }
+    }, [isReady]);
 
     // Background Animation Values
     const orb1Pos = useRef(new Animated.Value(0)).current;
@@ -125,7 +146,7 @@ export default function App() {
                         <View style={styles.headerRow}>
                             <View style={styles.topBar}>
                                 <View style={styles.statusDot} />
-                                <Text style={styles.brand}>NOSHAHI DEVELOPERS</Text>
+                                <Text style={styles.brand}>Noshahi Developers Inc.</Text>
                             </View>
                             <TouchableOpacity onPress={() => setShowSettings(true)} style={styles.profileBtn}>
                                 <Ionicons name="person-circle-outline" size={32} color="#fff" />
@@ -151,10 +172,42 @@ export default function App() {
                         </BlurView>
                     </View>
 
-                    <View style={styles.footer}>
-                        <VoiceHandler onSpeechResult={handleUserSpeech} />
-                        <Text style={styles.footerBrand}>AI Companion • Version 1.0.8</Text>
-                    </View>
+                    <KeyboardAvoidingView
+                        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                        style={styles.footer}
+                    >
+                        <View style={styles.inputContainer}>
+                            <TextInput
+                                style={styles.textInput}
+                                placeholder="Type a message..."
+                                placeholderTextColor="rgba(255,255,255,0.4)"
+                                value={userInputText}
+                                onChangeText={setUserInputText}
+                                onSubmitEditing={() => {
+                                    if (userInputText.trim()) {
+                                        handleUserSpeech(userInputText);
+                                        setUserInputText('');
+                                    }
+                                }}
+                            />
+                            <TouchableOpacity
+                                style={styles.sendBtn}
+                                onPress={() => {
+                                    if (userInputText.trim()) {
+                                        handleUserSpeech(userInputText);
+                                        setUserInputText('');
+                                    }
+                                }}
+                            >
+                                <Ionicons name="send" size={20} color="#fff" />
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.voiceWrapper}>
+                            <VoiceHandler onSpeechResult={handleUserSpeech} />
+                            <Text style={styles.footerBrand}>AI Companion • Version 1.0.8</Text>
+                        </View>
+                    </KeyboardAvoidingView>
 
                     {/* Settings Modal */}
                     <Modal
@@ -359,6 +412,43 @@ const styles = StyleSheet.create({
     resetBtn: { marginTop: 10, borderRadius: 20, overflow: 'hidden' },
     resetGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 15, gap: 10 },
     resetBtnText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 1 },
+
+    // Input Styles
+    inputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        marginBottom: 10,
+        gap: 10
+    },
+    textInput: {
+        flex: 1,
+        height: 50,
+        backgroundColor: 'rgba(255,255,255,0.08)',
+        borderRadius: 25,
+        paddingHorizontal: 20,
+        color: '#fff',
+        fontSize: 16,
+        borderWidth: 1,
+        borderColor: 'rgba(255,105,180,0.2)'
+    },
+    sendBtn: {
+        width: 50,
+        height: 50,
+        backgroundColor: '#ff69b4',
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+        shadowColor: '#ff69b4',
+        shadowOffset: { width: 0, height: 4 },
+        shadowRadius: 8,
+        shadowOpacity: 0.3
+    },
+    voiceWrapper: {
+        alignItems: 'center',
+        paddingBottom: 10
+    },
 
     // Background Orbs
     orb: {
