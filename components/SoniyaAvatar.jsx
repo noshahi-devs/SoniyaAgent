@@ -4,25 +4,16 @@ import { Animated, Image, StyleSheet, View } from 'react-native';
 const SoniyaAvatar = ({ mood, isSpeaking, viewType = 'FULL' }) => {
     const floatAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(1)).current;
-    const glowAnim = useRef(new Animated.Value(0.3)).current;
 
     const [currentFrame, setCurrentFrame] = useState(0); // 0: closed, 1: small, 2: large
     const lipsingInterval = useRef(null);
 
     useEffect(() => {
-        // Floating loop
+        // Floating loop - starts at 0 and goes UP, so it touches bottom at 0
         Animated.loop(
             Animated.sequence([
                 Animated.timing(floatAnim, { toValue: -15, duration: 3000, useNativeDriver: true }),
                 Animated.timing(floatAnim, { toValue: 0, duration: 3000, useNativeDriver: true }),
-            ])
-        ).start();
-
-        // Glow pulse
-        Animated.loop(
-            Animated.sequence([
-                Animated.timing(glowAnim, { toValue: 0.6, duration: 2000, useNativeDriver: true }),
-                Animated.timing(glowAnim, { toValue: 0.3, duration: 2000, useNativeDriver: true }),
             ])
         ).start();
 
@@ -59,9 +50,6 @@ const SoniyaAvatar = ({ mood, isSpeaking, viewType = 'FULL' }) => {
         }
     }, [isSpeaking]);
 
-    // Mood colors for the background glow
-    const glowColor = mood === 'LOVE' ? '#ff1493' : mood === 'HAPPY' ? '#ffd700' : mood === 'ANGRY' ? '#ff0000' : '#4b0082';
-
     // Image Source Logic
     const getAvatarImage = () => {
         if (viewType === 'HALF') return require('../assets/images/soniya_half.png');
@@ -77,7 +65,6 @@ const SoniyaAvatar = ({ mood, isSpeaking, viewType = 'FULL' }) => {
 
     return (
         <View style={styles.container}>
-            <Animated.View style={[styles.glow, { backgroundColor: glowColor, shadowColor: glowColor, opacity: glowAnim }]} />
             <Animated.View style={{ transform: [{ translateY: floatAnim }, { scale: scaleAnim }] }}>
                 <Image
                     source={getAvatarImage()}
@@ -94,14 +81,10 @@ const SoniyaAvatar = ({ mood, isSpeaking, viewType = 'FULL' }) => {
 };
 
 const styles = StyleSheet.create({
-    container: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
-    character: { width: 380, height: 450, marginBottom: -10 },
-    halfBody: { width: 450, height: 500, marginBottom: -20 },
-    closeupBody: { width: 550, height: 600, marginBottom: -30 },
-    glow: {
-        position: 'absolute', bottom: 100, width: 250, height: 250, borderRadius: 125,
-        elevation: 120, shadowRadius: 120, shadowOpacity: 1
-    }
+    container: { flex: 1, justifyContent: 'flex-end', alignItems: 'center', width: '100%', overflow: 'hidden' },
+    character: { width: 450, height: 600, marginBottom: 0 },
+    halfBody: { width: 480, height: 620, marginBottom: 0 },
+    closeupBody: { width: 550, height: 700, marginBottom: 0 },
 });
 
 export default SoniyaAvatar;
