@@ -25,9 +25,15 @@
       "permissions": [
         "RECORD_AUDIO",
         "MODIFY_AUDIO_SETTINGS",
+        "android.permission.RECORD_AUDIO",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
         "android.permission.RECORD_AUDIO"
       ],
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "runtimeVersion": {
+        "policy": "appVersion"
+      }
     },
     "web": {
       "favicon": "./assets/images/favicon.png"
@@ -52,6 +58,9 @@
       "eas": {
         "projectId": "8ff6606c-bea4-486b-99cf-d1267712241d"
       }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8ff6606c-bea4-486b-99cf-d1267712241d"
     }
   }
 }

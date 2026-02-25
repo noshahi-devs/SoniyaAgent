@@ -174,38 +174,44 @@ export default function App() {
 
                     <KeyboardAvoidingView
                         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                        style={styles.footer}
+                        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+                        style={styles.keyboardView}
                     >
-                        <View style={styles.inputContainer}>
-                            <TextInput
-                                style={styles.textInput}
-                                placeholder="Type a message..."
-                                placeholderTextColor="rgba(255,255,255,0.4)"
-                                value={userInputText}
-                                onChangeText={setUserInputText}
-                                onSubmitEditing={() => {
-                                    if (userInputText.trim()) {
-                                        handleUserSpeech(userInputText);
-                                        setUserInputText('');
-                                    }
-                                }}
-                            />
-                            <TouchableOpacity
-                                style={styles.sendBtn}
-                                onPress={() => {
-                                    if (userInputText.trim()) {
-                                        handleUserSpeech(userInputText);
-                                        setUserInputText('');
-                                    }
-                                }}
-                            >
-                                <Ionicons name="send" size={20} color="#fff" />
-                            </TouchableOpacity>
-                        </View>
+                        <View style={styles.footerInner}>
+                            <View style={styles.inputContainer}>
+                                <TextInput
+                                    style={styles.textInput}
+                                    placeholder="Type a message..."
+                                    placeholderTextColor="rgba(255,255,255,0.4)"
+                                    value={userInputText}
+                                    onChangeText={setUserInputText}
+                                    placeholderStyle={{ fontWeight: '400' }}
+                                    onSubmitEditing={() => {
+                                        if (userInputText.trim()) {
+                                            handleUserSpeech(userInputText);
+                                            setUserInputText('');
+                                        }
+                                    }}
+                                />
+                                <TouchableOpacity
+                                    style={styles.sendBtn}
+                                    onPress={() => {
+                                        if (userInputText.trim()) {
+                                            handleUserSpeech(userInputText);
+                                            setUserInputText('');
+                                        }
+                                    }}
+                                >
+                                    <View style={styles.sendIconBg}>
+                                        <Ionicons name="send" size={18} color="#fff" />
+                                    </View>
+                                </TouchableOpacity>
+                            </View>
 
-                        <View style={styles.voiceWrapper}>
-                            <VoiceHandler onSpeechResult={handleUserSpeech} />
-                            <Text style={styles.footerBrand}>AI Companion • Version 1.0.8</Text>
+                            <View style={styles.voiceWrapper}>
+                                <VoiceHandler onSpeechResult={handleUserSpeech} />
+                                <Text style={styles.footerBrand}>AI Companion • Version 1.0.8</Text>
+                            </View>
                         </View>
                     </KeyboardAvoidingView>
 
@@ -328,20 +334,20 @@ const styles = StyleSheet.create({
     appName: { color: '#fff', fontSize: 34, fontWeight: '900', letterSpacing: 1, textAlign: 'left', marginTop: 2 },
     v1: { color: '#ff69b4', fontSize: 18 },
 
-    avatarSpace: { height: '38%', justifyContent: 'center' },
+    avatarSpace: { flex: 4, justifyContent: 'flex-end', overflow: 'hidden' },
 
     contentContainer: {
-        flex: 1,
+        flex: 3,
         paddingHorizontal: 20,
-        marginBottom: 15,
+        marginBottom: 10,
     },
     chatBoxLayer: {
         flex: 1,
-        borderRadius: 40,
+        borderRadius: 35,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(255,105,180,0.15)',
-        backgroundColor: 'rgba(255,255,255,0.03)',
+        backgroundColor: 'rgba(255,255,255,0.04)',
         elevation: 10,
         shadowColor: '#ff69b4',
         shadowOffset: { width: 0, height: 5 },
@@ -350,17 +356,18 @@ const styles = StyleSheet.create({
     },
     speechText: {
         color: '#fff',
-        fontSize: 19,
+        fontSize: 18,
         textAlign: 'center',
-        lineHeight: 28,
+        lineHeight: 26,
         fontWeight: '600',
         textShadowColor: 'rgba(255, 105, 180, 0.4)',
         textShadowOffset: { width: 0, height: 0 },
         textShadowRadius: 10,
     },
 
-    footer: { paddingBottom: 25, alignItems: 'center' },
-    footerBrand: { color: 'rgba(255,255,255,0.25)', fontSize: 10, marginTop: 12, letterSpacing: 2, fontWeight: '600' },
+    keyboardView: { width: '100%' },
+    footerInner: { paddingBottom: 20, alignItems: 'center' },
+    footerBrand: { color: 'rgba(255,255,255,0.2)', fontSize: 10, marginTop: 10, letterSpacing: 2, fontWeight: '600' },
 
     // Modal Styles
     modalOverlay: { flex: 1, justifyContent: 'flex-end' },
@@ -423,55 +430,67 @@ const styles = StyleSheet.create({
     },
     textInput: {
         flex: 1,
-        height: 50,
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        borderRadius: 25,
-        paddingHorizontal: 20,
+        height: 54,
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 27,
+        paddingHorizontal: 22,
         color: '#fff',
         fontSize: 16,
         borderWidth: 1,
-        borderColor: 'rgba(255,105,180,0.2)'
+        borderColor: 'rgba(255,105,180,0.25)'
     },
     sendBtn: {
-        width: 50,
-        height: 50,
+        width: 54,
+        height: 54,
         backgroundColor: '#ff69b4',
-        borderRadius: 25,
+        borderRadius: 27,
         justifyContent: 'center',
         alignItems: 'center',
-        elevation: 5,
+        elevation: 8,
         shadowColor: '#ff69b4',
         shadowOffset: { width: 0, height: 4 },
-        shadowRadius: 8,
-        shadowOpacity: 0.3
+        shadowRadius: 10,
+        shadowOpacity: 0.4
     },
+    sendIconBg: { width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' },
     voiceWrapper: {
         alignItems: 'center',
-        paddingBottom: 10
+        paddingVertical: 5
     },
 
     // Background Orbs
     orb: {
         position: 'absolute',
-        width: 300,
-        height: 300,
-        borderRadius: 150,
-        opacity: 0.25,
-        filter: 'blur(80px)', // Note: React Native blur usually needs a different approach or BlurView, but we can use large shadow/radius for similar effect if filter not supported. For Expo, using BlurView inside these might be better but let's try opacity + scale first.
+        width: 400,
+        height: 400,
+        borderRadius: 200,
+        opacity: 0.15,
     },
     orb1: {
-        top: -50,
-        right: -50,
-        transform: [{ scale: 1.5 }],
+        top: -100,
+        right: -100,
+        backgroundColor: '#ff1493', // Neon Pink
+        transform: [{ scale: 2 }],
+        shadowColor: '#ff1493',
+        shadowRadius: 150,
+        shadowOpacity: 1,
     },
     orb2: {
-        bottom: '20%',
-        left: -100,
-        transform: [{ scale: 1.2 }],
+        bottom: '30%',
+        left: -150,
+        backgroundColor: '#00ffff', // Neon Cyan
+        transform: [{ scale: 1.5 }],
+        shadowColor: '#00ffff',
+        shadowRadius: 150,
+        shadowOpacity: 1,
     },
     orb3: {
-        top: '40%',
-        right: -150,
-        transform: [{ scale: 1.3 }],
+        top: '20%',
+        right: -200,
+        backgroundColor: '#8a2be2', // Neon Violet
+        transform: [{ scale: 1.8 }],
+        shadowColor: '#8a2be2',
+        shadowRadius: 150,
+        shadowOpacity: 1,
     },
 });

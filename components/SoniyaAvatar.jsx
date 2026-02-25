@@ -94,13 +94,13 @@ const SoniyaAvatar = ({ mood, isSpeaking, viewType = 'FULL' }) => {
 };
 
 const styles = StyleSheet.create({
-    container: { height: 400, justifyContent: 'center', alignItems: 'center' },
-    character: { width: 350, height: 400 },
-    halfBody: { width: 400, height: 450, marginTop: 50 },
-    closeupBody: { width: 500, height: 550, marginTop: 100 },
+    container: { flex: 1, justifyContent: 'flex-end', alignItems: 'center' },
+    character: { width: 380, height: 450, marginBottom: -10 },
+    halfBody: { width: 450, height: 500, marginBottom: -20 },
+    closeupBody: { width: 550, height: 600, marginBottom: -30 },
     glow: {
-        position: 'absolute', width: 220, height: 220, borderRadius: 110,
-        elevation: 100, shadowRadius: 100, shadowOpacity: 1
+        position: 'absolute', bottom: 100, width: 250, height: 250, borderRadius: 125,
+        elevation: 120, shadowRadius: 120, shadowOpacity: 1
     }
 });
 

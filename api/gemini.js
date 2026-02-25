@@ -104,7 +104,13 @@ Behavior Rules:
 
     return { text: cleanText, mood: mood };
   } catch (error) {
-    console.error("Gemini Error Detail:", error);
-    return { text: "Maaf karna Jaani, mere server mein thora masla aa raha hai. Thori dair baad try karein.", mood: "SAD" };
+    console.error("Gemini Error Depth:", error);
+    // Auto-clear history on repeat failures
+    if (chatHistory.length > 5) chatHistory.shift();
+
+    return {
+      text: "Maaf karna Jaani, connection mein kuch masla lag raha hai. Kya aap aik baar Refresh Memory dabba saktay hain?",
+      mood: "SAD"
+    };
   }
 };
