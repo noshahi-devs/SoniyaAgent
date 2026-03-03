@@ -7,36 +7,53 @@ const VoiceHandler = ({ onSpeechResult, disabled = false }) => {
     const [isListening, setIsListening] = useState(false);
     const pulseAnim = useRef(new Animated.Value(1)).current;
     const recognitionLangRef = useRef('ur-PK');
+    const isListeningRef = useRef(false);
+    const pulseLoopRef = useRef(null);
 
     useEffect(() => {
+        isListeningRef.current = isListening;
+
         if (isListening) {
-            Animated.loop(
+            pulseLoopRef.current = Animated.loop(
                 Animated.sequence([
-                    Animated.timing(pulseAnim, { toValue: 1.2, duration: 600, useNativeDriver: true }),
-                    Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+                    Animated.timing(pulseAnim, { toValue: 1.25, duration: 550, useNativeDriver: true }),
+                    Animated.timing(pulseAnim, { toValue: 1, duration: 550, useNativeDriver: true }),
                 ])
-            ).start();
+            );
+            pulseLoopRef.current.start();
         } else {
-            pulseAnim.setValue(1);
+            if (pulseLoopRef.current) {
+                pulseLoopRef.current.stop();
+            }
+            Animated.timing(pulseAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
         }
     }, [isListening]);
 
-    useSpeechRecognitionEvent("result", (event) => {
-        if (!isListening) return;
-        const transcript = event.results[0]?.transcript;
+    useSpeechRecognitionEvent('result', (event) => {
+        if (!isListeningRef.current) return;
+        const transcript = event.results?.[0]?.transcript;
         if (transcript) {
             onSpeechResult(transcript);
         }
     });
 
-    useSpeechRecognitionEvent("end", () => {
+    useSpeechRecognitionEvent('end', () => {
         setIsListening(false);
     });
 
-    const startRecognitionWithFallback = async () => {
-        const fallbackLangs = ['pa-PK', 'ur-PK', 'hi-IN', 'en-US'];
+    useSpeechRecognitionEvent('error', () => {
+        setIsListening(false);
+    });
 
-        for (const lang of fallbackLangs) {
+    const requestPermissionAndStart = async () => {
+        const result = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+        if (!result.granted) {
+            Alert.alert('Permission Required', 'Soniya ko mic ki zaroorat hai. Please allow microphone access.');
+            return false;
+        }
+
+        const langs = ['ur-PK', 'pa-PK', 'hi-IN', 'en-US'];
+        for (const lang of langs) {
             try {
                 await ExpoSpeechRecognitionModule.start({
                     lang,
@@ -46,52 +63,61 @@ const VoiceHandler = ({ onSpeechResult, disabled = false }) => {
                 recognitionLangRef.current = lang;
                 return true;
             } catch (_err) {
-                // Try next language until one starts successfully.
+                // Try next language.
             }
         }
 
+        Alert.alert('Voice Error', 'Voice recognition start nahi ho saka. Dobara try karein.');
         return false;
     };
 
     const handlePressIn = async () => {
-        if (disabled) return;
-        const result = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-        if (!result.granted) {
-            Alert.alert("Permission Required", "Soniya ko mic ki zaroorat hai.");
-            return;
+        if (disabled || isListeningRef.current) return;
+        const started = await requestPermissionAndStart();
+        if (started) {
+            setIsListening(true);
         }
-
-        const started = await startRecognitionWithFallback();
-        if (!started) {
-            Alert.alert("Mic Language Error", "Voice recognition start nahi ho saka. Dobara try karein.");
-            setIsListening(false);
-            return;
-        }
-        setIsListening(true);
     };
 
     const handlePressOut = () => {
-        ExpoSpeechRecognitionModule.stop();
+        if (!isListeningRef.current) return;
+        try {
+            ExpoSpeechRecognitionModule.stop();
+        } catch (_) { }
         setIsListening(false);
     };
 
     return (
         <View style={styles.container}>
-            <Animated.View style={[styles.pulseShadow, { transform: [{ scale: pulseAnim }], opacity: isListening ? 0.3 : 0 }]} />
+            <Animated.View
+                style={[
+                    styles.pulseShadow,
+                    { transform: [{ scale: pulseAnim }], opacity: isListening ? 0.35 : 0 },
+                ]}
+            />
             <TouchableOpacity
-                activeOpacity={0.8}
+                activeOpacity={0.75}
                 disabled={disabled}
                 onPressIn={handlePressIn}
                 onPressOut={handlePressOut}
+                delayLongPress={100}
             >
                 <LinearGradient
-                    colors={disabled ? ['#64748b', '#475569'] : isListening ? ['#ff4081', '#ff1493'] : ['#ff69b4', '#db7093']}
+                    colors={
+                        disabled
+                            ? ['#64748b', '#475569']
+                            : isListening
+                                ? ['#ff1493', '#e0004a']
+                                : ['#ff69b4', '#db7093']
+                    }
                     style={styles.btn}
                 >
                     <Text style={styles.btnText}>
                         {disabled
-                            ? "WAKE MODE ACTIVE"
-                            : isListening ? `LISTENING (${recognitionLangRef.current})...` : "HOLD TO SPEAK"}
+                            ? 'WAKE MODE ACTIVE'
+                            : isListening
+                                ? `🎙️ LISTENING (${recognitionLangRef.current})...`
+                                : '🎤 HOLD TO SPEAK'}
                     </Text>
                 </LinearGradient>
             </TouchableOpacity>
@@ -103,10 +129,10 @@ const styles = StyleSheet.create({
     container: { alignItems: 'center', justifyContent: 'center' },
     pulseShadow: {
         position: 'absolute',
-        width: 280,
+        width: 290,
         height: 80,
         borderRadius: 40,
-        backgroundColor: '#ff69b4',
+        backgroundColor: '#ff1493',
     },
     btn: {
         paddingVertical: 18,
@@ -116,10 +142,10 @@ const styles = StyleSheet.create({
         shadowColor: '#ff69b4',
         shadowOffset: { width: 0, height: 10 },
         shadowRadius: 15,
-        shadowOpacity: 0.4,
+        shadowOpacity: 0.5,
         elevation: 10,
     },
-    btnText: { color: 'white', fontWeight: '900', fontSize: 16, letterSpacing: 2 }
+    btnText: { color: 'white', fontWeight: '900', fontSize: 16, letterSpacing: 2 },
 });
 
 export default VoiceHandler;

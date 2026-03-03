@@ -7,7 +7,7 @@
       "policy": "fingerprint"
     },
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/android-icon-foreground.png",
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "cover",
@@ -26,16 +26,22 @@
     },
     "android": {
       "package": "com.yourname.soniyaagent",
-      "icon": "./assets/images/icon.png",
+      "icon": "./assets/images/android-icon-foreground.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundColor": "#050111"
       },
       "permissions": [
         "RECORD_AUDIO",
         "MODIFY_AUDIO_SETTINGS",
         "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_MICROPHONE"
+        "FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.RECORD_AUDIO",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.RECORD_AUDIO"
       ],
       "edgeToEdgeEnabled": true
     },
@@ -46,7 +52,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/android-icon-foreground.png",
           "resizeMode": "cover",
           "backgroundColor": "#000000",
           "imageWidth": 1080
@@ -65,7 +71,8 @@
     },
     "updates": {
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/4fecd7ce-e39d-4c9c-96c0-be4e81368f23"
     }
   }
 }

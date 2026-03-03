@@ -45,8 +45,7 @@ const SplashScreen = ({ onFinish }) => {
             <Animated.View style={[styles.ring, { transform: [{ rotate: spin }] }]} />
             <Animated.View style={[styles.ring, styles.ring2, { transform: [{ rotate: '-45deg' }, { scale: 1.2 }] }]} />
 
-            <Animated.View style={{ opacity: fadeAnim, transform: [{ scale: scaleAnim }], alignItems: 'center' }}>
-                <Text style={styles.logoText}>SONIYA</Text>
+            <Animated.View style={{ opacity: fadeAnim, transform: [{ scale: scaleAnim }], marginBottom: 20 }}>
                 <Animated.View style={{ opacity: textFadeAnim }}>
                     <Text style={styles.pro}>PREMIUM AI VERSION</Text>
                     <View style={styles.line} />

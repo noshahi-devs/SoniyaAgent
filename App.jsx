@@ -22,7 +22,7 @@ import {
     TouchableOpacity,
     View
 } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { askSoniya, clearChatHistory } from './api/gemini';
 import { initSoniyaVoice, soniyaSpeak } from './api/voiceService';
 import SoniyaAvatar from './components/SoniyaAvatar';
@@ -38,7 +38,8 @@ const QUICK_WAKE_REPLIES = [
     'Nabeel, aap ki Soniya hazir hai.'
 ];
 
-export default function App() {
+function AppContent() {
+    const insets = useSafeAreaInsets();
     const [isReady, setIsReady] = useState(false);
     const [soniyaWords, setSoniyaWords] = useState("Soniya: Loading...");
     const [mood, setMood] = useState("CALM");
@@ -113,6 +114,9 @@ export default function App() {
     }, [isSpeaking]);
 
     useEffect(() => {
+        if (Platform.OS === 'web') {
+            return () => {};
+        }
         const stateSub = AppState.addEventListener('change', setAppState);
         let batterySub = null;
 
@@ -291,7 +295,7 @@ export default function App() {
     if (!isReady) return <SplashScreen onFinish={() => setIsReady(true)} />;
 
     return (
-        <SafeAreaProvider>
+        <>
             <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
             <ImageBackground
                 source={BACKGROUND_IMG}
@@ -308,12 +312,8 @@ export default function App() {
                     <Animated.View style={[styles.orb, styles.orb2, { backgroundColor: '#00ffff', transform: [{ translateX: orb2Pos }, { scale: 1.5 }] }]} />
                 </View>
 
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                    style={{ flex: 1 }}
-                >
-                    <SafeAreaView style={styles.container}>
-                        <View style={styles.header}>
+                <SafeAreaView style={styles.container}>
+                    <View style={styles.header}>
                             <View style={styles.headerRow}>
                                 <View style={styles.topBar}>
                                     <View style={styles.statusDot} />
@@ -328,12 +328,15 @@ export default function App() {
                             <Text style={styles.appName}>SONIYA <Text style={styles.v1}>PRO</Text></Text>
                         </View>
 
-                        <View style={styles.stageArea}>
+                    <View style={styles.stageArea}>
                             <View style={styles.avatarLayer}>
-                                <SoniyaAvatar mood={mood} isSpeaking={isSpeaking} viewType={viewType} />
+                                <SoniyaAvatar mood={mood} isSpeaking={isSpeaking} viewType={viewType} bottomInset={insets.bottom} />
                             </View>
 
-                            <View style={styles.controlsOverlay}>
+                            <KeyboardAvoidingView
+                                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                                style={styles.controlsOverlay}
+                            >
                                 <BlurView intensity={45} tint="dark" style={styles.speechPanel}>
                                     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20 }}>
                                         <Text style={styles.speechText}>{soniyaWords}</Text>
@@ -377,10 +380,9 @@ export default function App() {
                                     </Text>
                                     <Text style={styles.footerBrand}>Powered by NDI - Soniya v1.2.0</Text>
                                 </View>
-                            </View>
-                        </View>
-                    </SafeAreaView>
-                </KeyboardAvoidingView>
+                            </KeyboardAvoidingView>
+                    </View>
+                </SafeAreaView>
 
                 <Modal visible={showSettings} animationType="slide" transparent onRequestClose={() => setShowSettings(false)}>
                     <View style={styles.modalOverlay}>
@@ -514,6 +516,14 @@ export default function App() {
                     </View>
                 </Modal>
             </ImageBackground>
+        </>
+    );
+}
+
+export default function App() {
+    return (
+        <SafeAreaProvider>
+            <AppContent />
         </SafeAreaProvider>
     );
 }
