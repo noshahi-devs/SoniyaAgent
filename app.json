@@ -2,16 +2,16 @@
   "expo": {
     "name": "Soniya Agent",
     "slug": "SoniyaAgent",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "runtimeVersion": {
       "policy": "fingerprint"
     },
     "orientation": "portrait",
     "icon": "./assets/images/android-icon-foreground.png",
     "splash": {
-      "image": "./assets/images/splash-icon.png",
+      "image": "./assets/images/android-icon-foreground.png",
       "resizeMode": "cover",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#693F4A"
     },
     "scheme": "soniyaagent",
     "userInterfaceStyle": "automatic",
@@ -32,16 +32,10 @@
         "backgroundColor": "#050111"
       },
       "permissions": [
-        "RECORD_AUDIO",
-        "MODIFY_AUDIO_SETTINGS",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_MICROPHONE",
         "android.permission.RECORD_AUDIO",
-        "RECORD_AUDIO",
-        "MODIFY_AUDIO_SETTINGS",
-        "FOREGROUND_SERVICE",
-        "FOREGROUND_SERVICE_MICROPHONE",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE"
       ],
       "edgeToEdgeEnabled": true
     },
@@ -54,7 +48,7 @@
         {
           "image": "./assets/images/android-icon-foreground.png",
           "resizeMode": "cover",
-          "backgroundColor": "#000000",
+          "backgroundColor": "#090979",
           "imageWidth": 1080
         }
       ],

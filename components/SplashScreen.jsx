@@ -1,6 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef } from 'react';
 import { Animated, Dimensions, ImageBackground, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width } = Dimensions.get('window');
 const SPLASH_IMAGE = require('../assets/images/splash-icon.png');
@@ -42,16 +43,18 @@ const SplashScreen = ({ onFinish }) => {
                 />
             </ImageBackground>
 
-            <Animated.View style={[styles.ring, { transform: [{ rotate: spin }] }]} />
-            <Animated.View style={[styles.ring, styles.ring2, { transform: [{ rotate: '-45deg' }, { scale: 1.2 }] }]} />
+            <Animated.View style={{ opacity: fadeAnim, transform: [{ scale: scaleAnim }] }}>
+                <Animated.View style={[styles.ring, { transform: [{ rotate: spin }] }]} />
+                <Animated.View style={[styles.ring, styles.ring2, { transform: [{ rotate: '-45deg' }, { scale: 1.2 }] }]} />
+            </Animated.View>
 
-            <Animated.View style={{ opacity: fadeAnim, transform: [{ scale: scaleAnim }], marginBottom: 20 }}>
-                <Animated.View style={{ opacity: textFadeAnim }}>
+            <SafeAreaView pointerEvents="none" style={styles.captionSafe}>
+                <Animated.View style={[styles.captionChip, { opacity: textFadeAnim }]}>
                     <Text style={styles.pro}>PREMIUM AI VERSION</Text>
                     <View style={styles.line} />
                     <Text style={styles.company}>Noshahi Developers Inc.</Text>
                 </Animated.View>
-            </Animated.View>
+            </SafeAreaView>
         </View>
     );
 };
@@ -59,6 +62,24 @@ const SplashScreen = ({ onFinish }) => {
 const styles = StyleSheet.create({
     container: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' },
     bgImage: { ...StyleSheet.absoluteFillObject },
+    captionSafe: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        alignItems: 'center',
+        paddingBottom: 14
+    },
+    captionChip: {
+        minWidth: 210,
+        paddingHorizontal: 14,
+        paddingTop: 10,
+        paddingBottom: 12,
+        borderRadius: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.18)',
+        backgroundColor: 'rgba(1,6,18,0.38)'
+    },
     ring: {
         position: 'absolute',
         width: width * 0.8,
@@ -83,9 +104,29 @@ const styles = StyleSheet.create({
         textShadowOffset: { width: 0, height: 0 },
         textShadowRadius: 40
     },
-    pro: { color: '#00ffff', fontSize: 16, fontWeight: '800', letterSpacing: 8, marginTop: 5, textAlign: 'center', textShadowColor: '#00ffff', textShadowRadius: 10 },
-    line: { width: 80, height: 3, backgroundColor: '#00ffff', marginVertical: 25, alignSelf: 'center', borderRadius: 2, shadowColor: '#00ffff', shadowRadius: 10, shadowOpacity: 0.8 },
-    company: { color: 'rgba(255,255,255,0.7)', fontSize: 12, letterSpacing: 6, fontWeight: '800', textAlign: 'center' }
+    pro: {
+        color: '#9beeff',
+        fontSize: 11,
+        fontWeight: '800',
+        letterSpacing: 3.2,
+        marginTop: 2,
+        textAlign: 'center'
+    },
+    line: {
+        width: 62,
+        height: 2,
+        backgroundColor: 'rgba(135, 236, 255, 0.9)',
+        marginVertical: 8,
+        alignSelf: 'center',
+        borderRadius: 2
+    },
+    company: {
+        color: 'rgba(255,255,255,0.74)',
+        fontSize: 10,
+        letterSpacing: 1.2,
+        fontWeight: '700',
+        textAlign: 'center'
+    }
 });
 
 export default SplashScreen;
