@@ -60,13 +60,14 @@
     },
     "extra": {
       "eas": {
-        "projectId": "4fecd7ce-e39d-4c9c-96c0-be4e81368f23"
+        "projectId": "8ff6606c-bea4-486b-99cf-d1267712241d"
       }
     },
     "updates": {
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 0,
-      "url": "https://u.expo.dev/4fecd7ce-e39d-4c9c-96c0-be4e81368f23"
-    }
+      "url": "https://u.expo.dev/8ff6606c-bea4-486b-99cf-d1267712241d"
+    },
+    "owner": "nabeel-khalil"
   }
 }
