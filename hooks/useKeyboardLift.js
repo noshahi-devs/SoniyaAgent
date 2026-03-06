@@ -1,29 +1,69 @@
-import { Animated, Keyboard, Platform } from 'react-native';
 import { useEffect } from 'react';
+import { Animated, Keyboard, Platform } from 'react-native';
 
-export const useKeyboardLift = ({ controlsTranslateY, insetBottom }) => {
+const KEYBOARD_TOP_SPACING = 2;
+
+export const useKeyboardLift = ({
+  translateY,
+  inputTranslateY,
+  staticTranslateY,
+  insetBottom,
+  onVisibilityChange
+}) => {
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const activeInputTranslateY = inputTranslateY || translateY;
 
     const onKeyboardShow = (event) => {
       const keyboardHeight = event?.endCoordinates?.height || 0;
       const overlap = keyboardHeight - insetBottom;
-      const lift = Math.max(0, overlap + 12);
+      const lift = Math.max(0, overlap + KEYBOARD_TOP_SPACING);
+      const isAndroid = Platform.OS === 'android';
+      onVisibilityChange?.(true);
 
-      Animated.timing(controlsTranslateY, {
-        toValue: -lift,
-        duration: event?.duration || 220,
-        useNativeDriver: true
-      }).start();
+      if (activeInputTranslateY) {
+        if (isAndroid) {
+          activeInputTranslateY.setValue(0);
+        } else {
+          Animated.timing(activeInputTranslateY, {
+            toValue: -lift,
+            duration: event?.duration || 220,
+            useNativeDriver: true
+          }).start();
+        }
+      }
+      if (staticTranslateY) {
+        if (isAndroid) {
+          staticTranslateY.setValue(lift);
+        } else {
+          staticTranslateY.setValue(0);
+        }
+      }
     };
 
     const onKeyboardHide = (event) => {
-      Animated.timing(controlsTranslateY, {
-        toValue: 0,
-        duration: event?.duration || 180,
-        useNativeDriver: true
-      }).start();
+      const isAndroid = Platform.OS === 'android';
+      onVisibilityChange?.(false);
+
+      if (activeInputTranslateY) {
+        if (isAndroid) {
+          activeInputTranslateY.setValue(0);
+        } else {
+          Animated.timing(activeInputTranslateY, {
+            toValue: 0,
+            duration: event?.duration || 180,
+            useNativeDriver: true
+          }).start();
+        }
+      }
+      if (staticTranslateY) {
+        if (isAndroid) {
+          staticTranslateY.setValue(0);
+        } else {
+          staticTranslateY.setValue(0);
+        }
+      }
     };
 
     const showSub = Keyboard.addListener(showEvent, onKeyboardShow);
@@ -33,5 +73,5 @@ export const useKeyboardLift = ({ controlsTranslateY, insetBottom }) => {
       showSub.remove();
       hideSub.remove();
     };
-  }, [controlsTranslateY, insetBottom]);
+  }, [translateY, inputTranslateY, staticTranslateY, insetBottom, onVisibilityChange]);
 };

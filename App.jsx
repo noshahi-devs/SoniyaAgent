@@ -78,8 +78,10 @@ const VOICE_HANDLER_LABELS = {
 };
 const BG_SWITCH_MS = 45000;
 const BG_FADE_MS = 6200;
+const INPUT_LINE_HEIGHT = 20;
+const MAX_VISIBLE_INPUT_LINES = 3;
 const MIN_INPUT_HEIGHT = 52;
-const MAX_INPUT_HEIGHT = 190;
+const MAX_INPUT_HEIGHT = MIN_INPUT_HEIGHT + (INPUT_LINE_HEIGHT * (MAX_VISIBLE_INPUT_LINES - 1));
 const TITLE_MAIN = 'SONIYA';
 const TITLE_PRO = 'Agent';
 const AVATAR_IDLE_DELAY_MS = 12000;
@@ -206,10 +208,12 @@ function AppContent() {
     const [voiceHandlerVariant, setVoiceHandlerVariant] = useState(DEFAULT_VOICE_HANDLER_VARIANT);
     const [userInputText, setUserInputText] = useState('');
     const [inputHeight, setInputHeight] = useState(MIN_INPUT_HEIGHT);
+    const [isInputScrollable, setIsInputScrollable] = useState(false);
     const [bgCurrentIndex, setBgCurrentIndex] = useState(0);
     const [bgNextIndex, setBgNextIndex] = useState(1);
     const [appState, setAppState] = useState(AppState.currentState);
-    const controlsTranslateY = useRef(new Animated.Value(0)).current;
+    const inputTranslateY = useRef(new Animated.Value(0)).current;
+    const staticUiTranslateY = useRef(new Animated.Value(0)).current;
     const sendPulse = useRef(new Animated.Value(0)).current;
     const bgFade = useRef(new Animated.Value(0)).current;
     const bgDrift = useRef(new Animated.Value(0)).current;
@@ -230,6 +234,7 @@ function AppContent() {
     const avatarIdleStartTimerRef = useRef(null);
     const avatarIdleRotateTimerRef = useRef(null);
     const lastAvatarIdleIndexRef = useRef(-1);
+    const inputBaseContentHeightRef = useRef(0);
 
     const heartFloat = useRef(new Animated.Value(0)).current;
     const butterflyFloat = useRef(new Animated.Value(0)).current;
@@ -763,6 +768,7 @@ function AppContent() {
     useEffect(() => {
         if (!userInputText) {
             setInputHeight(MIN_INPUT_HEIGHT);
+            setIsInputScrollable(false);
         }
     }, [userInputText]);
 
@@ -963,7 +969,11 @@ function AppContent() {
         };
     }, []);
 
-    useKeyboardLift({ controlsTranslateY, insetBottom: insets.bottom });
+    useKeyboardLift({
+        inputTranslateY,
+        staticTranslateY: staticUiTranslateY,
+        insetBottom: insets.bottom
+    });
 
     const previewVoiceSample = useCallback(async () => {
         if (isThinkingRef.current) return;
@@ -1106,12 +1116,27 @@ function AppContent() {
         handleUserSpeech(userInputText);
         setUserInputText('');
         setInputHeight(MIN_INPUT_HEIGHT);
+        setIsInputScrollable(false);
     }, [handleUserSpeech, userInputText]);
 
     const onInputContentSizeChange = useCallback((event) => {
-        const contentHeight = event?.nativeEvent?.contentSize?.height || MIN_INPUT_HEIGHT;
-        const nextHeight = clamp(contentHeight + 16, MIN_INPUT_HEIGHT, MAX_INPUT_HEIGHT);
+        const contentHeight = event?.nativeEvent?.contentSize?.height || 0;
+        if (!contentHeight) return;
+
+        if (!inputBaseContentHeightRef.current || contentHeight < inputBaseContentHeightRef.current) {
+            inputBaseContentHeightRef.current = contentHeight;
+        }
+
+        const baseContentHeight = inputBaseContentHeightRef.current || contentHeight;
+        const totalLines = Math.max(
+            1,
+            Math.ceil(Math.max(0, contentHeight - baseContentHeight) / INPUT_LINE_HEIGHT) + 1
+        );
+        const visibleLines = clamp(totalLines, 1, MAX_VISIBLE_INPUT_LINES);
+        const nextHeight = MIN_INPUT_HEIGHT + ((visibleLines - 1) * INPUT_LINE_HEIGHT);
+
         setInputHeight((prev) => (Math.abs(prev - nextHeight) > 1 ? nextHeight : prev));
+        setIsInputScrollable(totalLines > MAX_VISIBLE_INPUT_LINES);
     }, []);
 
     const currentScene = BACKGROUND_SCENES[bgCurrentIndex % BACKGROUND_SCENES.length];
@@ -1146,7 +1171,12 @@ function AppContent() {
                         styles.backgroundLayer,
                         {
                             opacity: baseBgOpacity,
-                            transform: [{ scale: backgroundScale }, { translateX: backgroundShiftX }, { translateY: backgroundShiftY }]
+                            transform: [
+                                { translateY: staticUiTranslateY },
+                                { scale: backgroundScale },
+                                { translateX: backgroundShiftX },
+                                { translateY: backgroundShiftY }
+                            ]
                         }
                     ]}
                 >
@@ -1159,7 +1189,12 @@ function AppContent() {
                         styles.backgroundLayer,
                         {
                             opacity: bgFade,
-                            transform: [{ scale: backgroundScale }, { translateX: Animated.multiply(backgroundShiftX, -1) }, { translateY: Animated.multiply(backgroundShiftY, -1) }]
+                            transform: [
+                                { translateY: staticUiTranslateY },
+                                { scale: backgroundScale },
+                                { translateX: Animated.multiply(backgroundShiftX, -1) },
+                                { translateY: Animated.multiply(backgroundShiftY, -1) }
+                            ]
                         }
                     ]}
                 >
@@ -1167,11 +1202,11 @@ function AppContent() {
                     <LinearGradient colors={nextOverlay} style={StyleSheet.absoluteFill} />
                 </Animated.View>
 
-                <View style={StyleSheet.absoluteFill}>
+                <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateY: staticUiTranslateY }] }]}>
                     <Animated.View style={[styles.orb, styles.orb1, { backgroundColor: midnightMode ? '#4b0082' : '#ff00ff', transform: [{ translateY: orb1Pos }, { scale: 1.8 }] }]} />
                     <Animated.View style={[styles.orb, styles.orb2, { backgroundColor: '#00ffff', transform: [{ translateX: orb2Pos }, { scale: 1.5 }] }]} />
-                </View>
-                <View pointerEvents="none" style={styles.decorLayer}>
+                </Animated.View>
+                <Animated.View pointerEvents="none" style={[styles.decorLayer, { transform: [{ translateY: staticUiTranslateY }] }]}>
                     <Animated.View
                         style={[
                             styles.energyHaloA,
@@ -1221,10 +1256,10 @@ function AppContent() {
                     <Animated.View style={[styles.decorItem, styles.starDecor, { transform: [{ translateY: sparkleFloat }, { translateX: butterflySway }] }]}>
                         <Ionicons name="star" size={22} color="rgba(255, 245, 175, 0.96)" />
                     </Animated.View>
-                </View>
+                </Animated.View>
 
-                <SafeAreaView style={styles.container}>
-                    <View style={styles.header}>
+                <SafeAreaView edges={['top', 'left', 'right']} style={styles.container}>
+                    <Animated.View style={[styles.header, { transform: [{ translateY: staticUiTranslateY }] }]}>
                             <View style={styles.headerRow}>
                                 <View style={styles.topBar}>
                                     <View style={styles.companyLogoCircle}>
@@ -1309,10 +1344,15 @@ function AppContent() {
                                     </View>
                                 </View>
                             </Animated.View>
-                        </View>
+                        </Animated.View>
 
                     <View style={styles.stageArea}>
-                            <View style={styles.avatarLayer}>
+                            <Animated.View
+                                style={[
+                                    styles.avatarLayer,
+                                    { transform: [{ translateY: staticUiTranslateY }] }
+                                ]}
+                            >
                                 <SoniyaAvatar
                                     mood={mood}
                                     isSpeaking={isSpeaking && !isThinking}
@@ -1323,98 +1363,134 @@ function AppContent() {
                                     styleVariant={avatarStyle}
                                     autoModeEnabled={autoAvatarMode}
                                 />
-                            </View>
+                            </Animated.View>
 
                             <Animated.View
                                 style={[
                                     styles.controlsOverlay,
                                     {
-                                        paddingBottom: Math.max(14, insets.bottom + 6),
-                                        transform: [{ translateY: controlsTranslateY }]
+                                        paddingBottom: Math.max(3, insets.bottom + 3)
                                     }
                                 ]}
                             >
-                                <BlurView intensity={45} tint="dark" style={styles.speechPanel}>
-                                    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20 }}>
-                                        <Text style={styles.speechText}>{soniyaWords}</Text>
-                                    </ScrollView>
-                                </BlurView>
-
-                                <View style={styles.footerInner}>
-                                    <View style={styles.inputContainer}>
-                                        <TextInput
-                                            style={[styles.textInput, styles.textInputMultiline, { height: inputHeight }]}
-                                            placeholder={`Baat karein ${userName}...`}
-                                            placeholderTextColor="rgba(255,255,255,0.4)"
-                                            value={userInputText}
-                                            onChangeText={(value) => {
-                                                setUserInputText(value);
-                                                if (value?.trim()) {
-                                                    if (autoAvatarMode) {
-                                                        scheduleAvatarIdleCycle(AVATAR_IDLE_DELAY_MS + 6000);
-                                                    }
-                                                } else if (autoAvatarMode) {
-                                                    scheduleAvatarIdleCycle();
-                                                }
-                                            }}
-                                            onContentSizeChange={onInputContentSizeChange}
-                                            multiline
-                                            blurOnSubmit={false}
-                                            returnKeyType="default"
-                                            scrollEnabled={false}
-                                            disableFullscreenUI
-                                            textAlignVertical="top"
-                                        />
-                                        <Animated.View
-                                            style={[
-                                                styles.sendBtnWrap,
-                                                {
-                                                    transform: [{
-                                                        scale: sendPulse.interpolate({
+                                <Animated.View style={{ transform: [{ translateY: staticUiTranslateY }] }}>
+                                    <View style={styles.controlsTopRow}>
+                                        {alwaysListenEnabled && (
+                                            <Animated.View
+                                                style={[
+                                                    styles.wakeBadge,
+                                                    {
+                                                        opacity: sendPulse.interpolate({
                                                             inputRange: [0, 1],
-                                                            outputRange: [1, 1.08]
+                                                            outputRange: [0.45, 1]
                                                         })
-                                                    }],
-                                                    opacity: sendPulse.interpolate({
-                                                        inputRange: [0, 1],
-                                                        outputRange: [0.9, 1]
-                                                    })
-                                                }
+                                                    }
+                                                ]}
+                                            >
+                                                <View
+                                                    style={[
+                                                        styles.wakeBadgeDot,
+                                                        isWakeListening && styles.wakeBadgeDotActive
+                                                    ]}
+                                                />
+                                                <Text style={styles.wakeBadgeText}>
+                                                    {`Auto Listen ON (${wakeLang}) | ${isWakeListening ? 'Listening' : 'Waiting'}`}
+                                                </Text>
+                                            </Animated.View>
+                                        )}
+                                        <View
+                                            style={[
+                                                styles.voiceHandlerDock,
+                                                voiceHandlerVariant === 'AI' && styles.voiceHandlerDockPanel,
+                                                !alwaysListenEnabled && styles.voiceHandlerDockSolo
                                             ]}
                                         >
-                                            <TouchableOpacity
-                                                style={styles.sendBtn}
-                                                onPress={sendTypedMessage}
-                                            >
-                                                <LinearGradient colors={['#ff69b4', '#ff1493', '#ff7ad1']} style={styles.sendIconBg}>
-                                                    <Ionicons name="send" size={18} color="#fff" />
-                                                </LinearGradient>
-                                            </TouchableOpacity>
-                                        </Animated.View>
+                                            <VoiceHandler
+                                                onSpeechResult={handleUserSpeech}
+                                                disabled={isThinking || isSpeaking}
+                                                variant={voiceHandlerVariant}
+                                                onListenStart={() => {
+                                                    isManualListeningRef.current = true;
+                                                    if (alwaysListenEnabled) {
+                                                        stopWakeListening();
+                                                    }
+                                                }}
+                                                onListenEnd={() => {
+                                                    isManualListeningRef.current = false;
+                                                }}
+                                            />
+                                        </View>
                                     </View>
-                                    <VoiceHandler
-                                        onSpeechResult={handleUserSpeech}
-                                        disabled={isThinking || isSpeaking}
-                                        variant={voiceHandlerVariant}
-                                        onListenStart={() => {
-                                            isManualListeningRef.current = true;
-                                            if (alwaysListenEnabled) {
-                                                stopWakeListening();
-                                            }
-                                        }}
-                                        onListenEnd={() => {
-                                            isManualListeningRef.current = false;
-                                        }}
-                                    />
-                                    <Text style={styles.wakeStatus}>
-                                        {!speechRecognitionAvailable
-                                            ? 'Speech recognition unavailable in this runtime'
-                                            : alwaysListenEnabled
-                                            ? `Auto Listen ON (${wakeLang}) | ${isWakeListening ? 'Listening' : 'Waiting'}`
-                                            : 'Wake mode OFF'}
-                                    </Text>
-                                    <Text style={styles.footerBrand}>Powered by NDI - Soniya v1.2.0</Text>
-                                </View>
+                                </Animated.View>
+                                <Animated.View
+                                    style={[
+                                        styles.keyboardLiftWrap,
+                                        { transform: [{ translateY: inputTranslateY }] }
+                                    ]}
+                                >
+                                    <BlurView intensity={45} tint="dark" style={styles.speechPanel}>
+                                        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20 }}>
+                                            <Text style={styles.speechText}>{soniyaWords}</Text>
+                                        </ScrollView>
+                                    </BlurView>
+
+                                    <View style={styles.footerInner}>
+                                        <View style={styles.inputContainer}>
+                                            <TextInput
+                                                style={[styles.textInput, styles.textInputMultiline, { height: inputHeight }]}
+                                                placeholder={`Baat karein ${userName}...`}
+                                                placeholderTextColor="rgba(255,255,255,0.4)"
+                                                value={userInputText}
+                                                onChangeText={(value) => {
+                                                    setUserInputText(value);
+                                                    if (value?.trim()) {
+                                                        if (autoAvatarMode) {
+                                                            scheduleAvatarIdleCycle(AVATAR_IDLE_DELAY_MS + 6000);
+                                                        }
+                                                    } else if (autoAvatarMode) {
+                                                        scheduleAvatarIdleCycle();
+                                                    }
+                                                }}
+                                                onContentSizeChange={onInputContentSizeChange}
+                                                multiline
+                                                blurOnSubmit={false}
+                                                returnKeyType="default"
+                                                scrollEnabled={isInputScrollable}
+                                                disableFullscreenUI
+                                                textAlignVertical="top"
+                                            />
+                                            <Animated.View
+                                                style={[
+                                                    styles.sendBtnWrap,
+                                                    {
+                                                        transform: [{
+                                                            scale: sendPulse.interpolate({
+                                                                inputRange: [0, 1],
+                                                                outputRange: [1, 1.08]
+                                                            })
+                                                        }],
+                                                        opacity: sendPulse.interpolate({
+                                                            inputRange: [0, 1],
+                                                            outputRange: [0.9, 1]
+                                                        })
+                                                    }
+                                                ]}
+                                            >
+                                                <TouchableOpacity
+                                                    style={styles.sendBtn}
+                                                    onPress={sendTypedMessage}
+                                                >
+                                                    <LinearGradient colors={['#ff69b4', '#ff1493', '#ff7ad1']} style={styles.sendIconBg}>
+                                                        <Ionicons name="send" size={18} color="#fff" />
+                                                    </LinearGradient>
+                                                </TouchableOpacity>
+                                            </Animated.View>
+                                        </View>
+                                    </View>
+                                </Animated.View>
+                                <Animated.Text style={[styles.footerBrand, { transform: [{ translateY: staticUiTranslateY }] }]}>
+                                    Powered by NDI - Soniya v1.2.0
+                                </Animated.Text>
                             </Animated.View>
                     </View>
                 </SafeAreaView>
@@ -1773,7 +1849,7 @@ export default function App() {
 const styles = StyleSheet.create({
     container: { flex: 1, position: 'relative' },
     backgroundLayer: { ...StyleSheet.absoluteFillObject },
-    header: { marginTop: 10, paddingHorizontal: 25, zIndex: 5 },
+    header: { marginTop: -2, paddingHorizontal: 25, zIndex: 5 },
     headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     topBar: {
         flexDirection: 'row',
@@ -1782,14 +1858,14 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.22)',
-        paddingHorizontal: 11,
-        paddingVertical: 7
+        paddingHorizontal: 9,
+        paddingVertical: 5
     },
     companyLogoCircle: {
-        width: 26,
-        height: 26,
-        borderRadius: 13,
-        marginRight: 5,
+        width: 23,
+        height: 23,
+        borderRadius: 11.5,
+        marginRight: 4,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.22)',
@@ -1801,8 +1877,8 @@ const styles = StyleSheet.create({
     statusDot: { width: 6, height: 3, borderRadius: 2, backgroundColor: '#4ade80', marginRight: 4, shadowColor: '#4ade80', shadowRadius: 5, shadowOpacity: 0.8 },
     brand: {
         color: 'rgba(255,255,255,0.93)',
-        fontSize: 9,
-        letterSpacing: 0.8,
+        fontSize: 8,
+        letterSpacing: 0.6,
         fontWeight: '900',
         textShadowColor: 'rgba(0,0,0,0.45)',
         textShadowOffset: { width: 0, height: 1 },
@@ -1812,9 +1888,9 @@ const styles = StyleSheet.create({
     profileIconWrapper: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,105,180,0.25)', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
     appNameWrap: {
         alignSelf: 'flex-start',
-        marginTop: 10,
-        paddingHorizontal: 12,
-        paddingVertical: 2,
+        marginTop: 2,
+        paddingHorizontal: 10,
+        paddingVertical: 1,
         borderRadius: 14,
         overflow: 'hidden',
         borderWidth: 1,
@@ -1836,17 +1912,17 @@ const styles = StyleSheet.create({
     appNameRow: { flexDirection: 'row', alignItems: 'center' },
     appNameWord: { flexDirection: 'row', alignItems: 'center' },
     appNameLetter: {
-        fontSize: 30,
+        fontSize: 25,
         fontWeight: '900',
-        letterSpacing: 1.2,
+        letterSpacing: 0.8,
         textShadowColor: 'rgba(2, 8, 20, 0.55)',
         textShadowOffset: { width: 0, height: 2 },
         textShadowRadius: 5
     },
     proPill: {
-        marginLeft: 4,
-        paddingHorizontal: 7,
-        paddingVertical: 3,
+        marginLeft: 2,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
         borderRadius: 999,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.26)',
@@ -1859,13 +1935,65 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.28
     },
     proLetter: {
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: '900',
-        letterSpacing: 0.9
+        letterSpacing: 0.6
     },
     stageArea: { flex: 1, justifyContent: 'flex-end' },
     avatarLayer: { ...StyleSheet.absoluteFillObject, zIndex: 2, justifyContent: 'flex-end' },
     controlsOverlay: { zIndex: 6, paddingHorizontal: 16, paddingBottom: 14 },
+    controlsTopRow: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        gap: 10,
+        marginBottom: 8,
+        flexWrap: 'wrap'
+    },
+    wakeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 999,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.16)',
+        backgroundColor: 'rgba(3,12,28,0.72)',
+        maxWidth: '72%'
+    },
+    wakeBadgeDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#7dd3fc',
+        shadowColor: '#7dd3fc',
+        shadowOffset: { width: 0, height: 0 },
+        shadowOpacity: 0.8,
+        shadowRadius: 6
+    },
+    wakeBadgeDotActive: {
+        backgroundColor: '#4ade80',
+        shadowColor: '#4ade80'
+    },
+    wakeBadgeText: {
+        color: 'rgba(255,255,255,0.88)',
+        fontSize: 11,
+        fontWeight: '800',
+        letterSpacing: 0.3
+    },
+    voiceHandlerDock: {
+        alignSelf: 'flex-end',
+        zIndex: 8
+    },
+    voiceHandlerDockSolo: {
+        marginLeft: 'auto'
+    },
+    voiceHandlerDockPanel: {
+        width: '100%',
+        alignSelf: 'stretch'
+    },
     speechPanel: {
         maxHeight: SCREEN_HEIGHT * 0.2,
         borderRadius: 24,
@@ -1877,7 +2005,6 @@ const styles = StyleSheet.create({
     },
     speechText: { color: '#fff', fontSize: 18, textAlign: 'center', lineHeight: 26, fontWeight: '600' },
     footerInner: { alignItems: 'center', width: '100%' },
-    wakeStatus: { color: 'rgba(255,255,255,0.65)', fontSize: 11, marginTop: 8, fontWeight: '700', letterSpacing: 0.3 },
     footerBrand: { color: 'rgba(255,255,255,0.2)', fontSize: 10, marginTop: 10, letterSpacing: 2, fontWeight: '600' },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
     modalContent: { height: '85%', borderTopLeftRadius: 40, borderTopRightRadius: 40, overflow: 'hidden', borderTopWidth: 1, borderTopColor: 'rgba(255, 105, 180, 0.3)' },
@@ -2113,25 +2240,42 @@ const styles = StyleSheet.create({
     manualItemTitle: { color: '#fff', fontSize: 13, fontWeight: '800' },
     manualItemTrigger: { color: '#7dd3fc', fontSize: 12, marginTop: 3, fontWeight: '700' },
     manualItemResult: { color: 'rgba(255,255,255,0.84)', fontSize: 12, marginTop: 3 },
-    inputContainer: { flexDirection: 'row', alignItems: 'flex-end', width: '100%', marginBottom: 5, gap: 10 },
-    textInput: {
-        flex: 1,
+    keyboardLiftWrap: { width: '100%', zIndex: 3 },
+    inputContainer: {
+        width: '100%',
+        marginBottom: 5,
+        position: 'relative',
+        justifyContent: 'flex-end',
+        overflow: 'hidden',
+        borderRadius: 28,
+        borderWidth: 1,
+        borderColor: 'rgba(255,105,180,0.36)',
         backgroundColor: 'rgba(2,8,22,0.66)',
+        paddingLeft: 18,
+        paddingRight: 68,
+        paddingVertical: 6
+    },
+    textInput: {
+        width: '100%',
+        backgroundColor: 'transparent',
         borderRadius: 26,
-        paddingHorizontal: 18,
+        paddingHorizontal: 0,
         color: '#fff',
         fontSize: 16,
-        borderWidth: 1,
-        borderColor: 'rgba(255,105,180,0.36)'
+        borderWidth: 0,
+        borderColor: 'transparent'
     },
     textInputMultiline: {
         minHeight: MIN_INPUT_HEIGHT,
         maxHeight: MAX_INPUT_HEIGHT,
         paddingTop: 14,
         paddingBottom: 14,
-        lineHeight: 21
+        lineHeight: INPUT_LINE_HEIGHT
     },
     sendBtnWrap: {
+        position: 'absolute',
+        right: 6,
+        bottom: 6,
         shadowColor: '#ff5fb5',
         shadowOffset: { width: 0, height: 0 },
         shadowRadius: 15

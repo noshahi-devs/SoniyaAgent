@@ -1,7 +1,9 @@
 import * as Haptics from 'expo-haptics';
 import * as Speech from 'expo-speech';
+import { Platform } from 'react-native';
 
 const PREFERRED_LANGS = ['ur-PK', 'pa-PK', 'pa-IN', 'ur-IN', 'hi-IN', 'en-US'];
+const DEFAULT_FALLBACK_LANGUAGE = 'en-US';
 const STYLE_REFERENCE_PRESETS = [
     {
         id: 'soniya_default',
@@ -43,6 +45,49 @@ let namedPresetOptions = [];
 
 const normalizeLang = (value) => (value || '').toLowerCase().replace('_', '-');
 const normalizeText = (value) => (value || '').toLowerCase();
+const isAndroid = Platform.OS === 'android';
+const normalizeSpeechLanguage = (value, fallback = '') => {
+    const normalized = normalizeLang(value || fallback);
+    if (!normalized) return '';
+
+    if (!isAndroid) {
+        return value || fallback || '';
+    }
+
+    // expo-speech Android creates Locale(languageString), so use the primary language tag only.
+    return normalized.split('-')[0] || '';
+};
+const isGenericLanguageVoiceIdentifier = (value) => {
+    const normalized = normalizeText(value);
+    if (!normalized) return true;
+
+    return (
+        normalized.endsWith('-language')
+        || /^[a-z]{2,3}(-[a-z]{2,4})?-language$/.test(normalized)
+        || /^[a-z]{2,3}(-[a-z]{2,4})?$/.test(normalized)
+    );
+};
+const serializeSpeechError = (err) => {
+    if (!err) return 'Unknown speech error';
+    if (typeof err === 'string') return err;
+
+    const summary = [
+        err.code,
+        err.message,
+        err.domain,
+        err.nativeStackAndroid ? 'native-stack' : ''
+    ].filter(Boolean);
+
+    if (summary.length) {
+        return summary.join(' | ');
+    }
+
+    try {
+        return JSON.stringify(err);
+    } catch (_error) {
+        return String(err);
+    }
+};
 
 const isFeminineLikeVoice = (voice) => {
     const name = normalizeText(voice?.name);
@@ -116,7 +161,7 @@ const buildNamedPresetOptions = () => {
             gender: assignedVoice?.gender || '',
             pitch: preset.pitch,
             preferredLangs: preset.preferredLangs,
-            preferredLanguage: assignedVoice?.language || preset.preferredLangs[0],
+            preferredLanguage: assignedVoice?.language || '',
             voiceIdentifier: assignedVoice?.identifier || ''
         };
     });
@@ -158,7 +203,7 @@ export const setPreferredVoice = (voiceId) => {
 
     selectedVoicePreset = preset;
     const found = availableVoices.find((voice) => voice.identifier === preset.voiceIdentifier)
-        || findBestVoice(getUsableVoices(), '', PREFERRED_LANGS);
+        || findBestVoice(getUsableVoices(), '', preset.preferredLangs || PREFERRED_LANGS);
     if (found) {
         selectedVoice = found;
     }
@@ -188,7 +233,7 @@ export const soniyaSpeak = (text, onStart, onEnd, options = {}) => {
     if (!text) return;
 
     Speech.stop();
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
     const voiceId = options.voiceId || selectedVoicePreset?.id || selectedVoice?.identifier;
     const activeVoice = setPreferredVoice(voiceId) || selectedVoice;
@@ -196,22 +241,71 @@ export const soniyaSpeak = (text, onStart, onEnd, options = {}) => {
 
     const rate = Number.isFinite(options.rate) ? options.rate : 1.0;
     const pitch = Number.isFinite(options.pitch) ? options.pitch : (activePreset?.pitch || 1.0);
+    const preferredLanguage = normalizeSpeechLanguage(
+        options.language || activeVoice?.language || activePreset?.preferredLanguage || '',
+        DEFAULT_FALLBACK_LANGUAGE
+    );
+    const preferredVoice = isAndroid && isGenericLanguageVoiceIdentifier(activeVoice?.identifier)
+        ? ''
+        : (activeVoice?.identifier || '');
+    let hasEnded = false;
 
-    Speech.speak(text, {
-        language: options.language || activePreset?.preferredLanguage || activeVoice?.language || 'ur-PK',
-        voice: activeVoice?.identifier,
-        pitch,
-        rate,
-        onStart: () => {
-            if (onStart) onStart();
-        },
-        onDone: () => {
-            if (onEnd) onEnd();
-        },
-        onError: (err) => {
-            console.log('Speech Error:', err);
-            if (onEnd) onEnd();
+    const finish = () => {
+        if (hasEnded) return;
+        hasEnded = true;
+        if (onEnd) onEnd();
+    };
+
+    const speakAttempt = ({ language, voice, fallback = false }) => {
+        const speakOptions = {
+            pitch,
+            rate,
+            onStart: () => {
+                if (onStart) onStart();
+            },
+            onDone: finish,
+            onError: (err) => {
+                const errorSummary = serializeSpeechError(err);
+
+                if (!fallback) {
+                    console.log('Speech Error:', errorSummary, {
+                        attemptedLanguage: language || 'device-default',
+                        attemptedVoice: voice || 'device-default',
+                        platform: Platform.OS
+                    });
+
+                    Speech.stop();
+                    speakAttempt({
+                        language: normalizeSpeechLanguage(DEFAULT_FALLBACK_LANGUAGE, DEFAULT_FALLBACK_LANGUAGE),
+                        voice: '',
+                        fallback: true
+                    });
+                    return;
+                }
+
+                console.log('Speech Error (fallback):', errorSummary, {
+                    attemptedLanguage: language || 'device-default',
+                    attemptedVoice: voice || 'device-default',
+                    platform: Platform.OS
+                });
+                finish();
+            }
+        };
+
+        if (language) {
+            speakOptions.language = language;
         }
+        if (voice) {
+            speakOptions.voice = voice;
+        }
+
+        Speech.speak(text, speakOptions);
+    };
+
+    speakAttempt({
+        language: preferredLanguage,
+        voice: preferredVoice,
+        fallback: false
     });
 };
 

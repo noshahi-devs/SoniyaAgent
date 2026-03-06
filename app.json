@@ -53,7 +53,8 @@
         }
       ],
       "expo-speech-recognition",
-      "expo-font"
+      "expo-font",
+      "./plugins/withAndroidAdjustNothing"
     ],
     "experiments": {
       "reactCompiler": true

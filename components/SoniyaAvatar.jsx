@@ -179,6 +179,7 @@ const SoniyaAvatar = ({
     const speakPulseLoopRef = useRef(null);
     const activityPulseLoopRef = useRef(null);
     const poseSwitchTimerRef = useRef(null);
+    const fadeResetFrameRef = useRef(null);
     const displaySourceRef = useRef(AVATAR_SOURCES.FULL);
     const incomingSourceRef = useRef(null);
 
@@ -212,6 +213,21 @@ const SoniyaAvatar = ({
         }
     };
 
+    const cancelPendingFadeReset = useCallback(() => {
+        if (fadeResetFrameRef.current !== null) {
+            cancelAnimationFrame(fadeResetFrameRef.current);
+            fadeResetFrameRef.current = null;
+        }
+    }, []);
+
+    const queueFadeReset = useCallback(() => {
+        cancelPendingFadeReset();
+        fadeResetFrameRef.current = requestAnimationFrame(() => {
+            fadeResetFrameRef.current = null;
+            avatarFade.setValue(0);
+        });
+    }, [avatarFade, cancelPendingFadeReset]);
+
     useEffect(() => {
         startIdleFloat();
         activityPulseLoopRef.current = Animated.loop(
@@ -227,10 +243,11 @@ const SoniyaAvatar = ({
             if (activityPulseLoopRef.current) activityPulseLoopRef.current.stop();
             if (poseSwitchTimerRef.current) clearTimeout(poseSwitchTimerRef.current);
             avatarFade.stopAnimation();
+            cancelPendingFadeReset();
             stopSpeakPulse();
             if (lipsingInterval.current) clearInterval(lipsingInterval.current);
         };
-    }, [activityPulse, avatarFade, startIdleFloat]);
+    }, [activityPulse, avatarFade, cancelPendingFadeReset, startIdleFloat]);
 
     useEffect(() => {
         if (isSpeaking) {
@@ -323,13 +340,15 @@ const SoniyaAvatar = ({
     );
 
     useEffect(() => {
+        cancelPendingFadeReset();
+
         if (isSpeaking) {
             avatarFade.stopAnimation();
-            avatarFade.setValue(0);
             incomingSourceRef.current = null;
             setIncomingSource(null);
             displaySourceRef.current = speakingAvatarSource;
             setDisplaySource(speakingAvatarSource);
+            queueFadeReset();
             return;
         }
 
@@ -355,9 +374,9 @@ const SoniyaAvatar = ({
             incomingSourceRef.current = null;
             setDisplaySource(staticAvatarSource);
             setIncomingSource(null);
-            avatarFade.setValue(0);
+            queueFadeReset();
         });
-    }, [avatarFade, isSpeaking, speakingAvatarSource, staticAvatarSource]);
+    }, [avatarFade, cancelPendingFadeReset, isSpeaking, queueFadeReset, speakingAvatarSource, staticAvatarSource]);
 
     const activityBodyTransform = useMemo(() => {
         if (resolvedActivity === 'SLEEP') {
