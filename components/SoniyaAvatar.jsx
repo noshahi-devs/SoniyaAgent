@@ -72,8 +72,7 @@ const ACTIVITY_POSE_POOLS = {
         require('../assets/images/1 soniya_pose_relax.png')
     ],
     SLEEP: [
-        require('../assets/images/soniya_pose_sleep.png'),
-        require('../assets/images/1 soniya_pose_sleep.png')
+        require('../assets/images/soniya_pose_sleep.png')
     ],
     OFFICE: [
         require('../assets/images/soniya_pose_office.png'),

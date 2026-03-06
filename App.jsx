@@ -3,7 +3,6 @@ import Slider from '@react-native-community/slider';
 import * as Battery from 'expo-battery';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Animated,
@@ -31,6 +30,11 @@ import SplashScreen from './components/SplashScreen';
 import VoiceHandler from './components/VoiceHandler';
 import { useKeyboardLift } from './hooks/useKeyboardLift';
 import { useUiSettingsStorage } from './hooks/useUiSettingsStorage';
+import {
+    ExpoSpeechRecognitionModule,
+    isSpeechRecognitionAvailable,
+    useSpeechRecognitionEvent
+} from './utils/speechRecognitionSafe';
 
 const BACKGROUND_SCENES = [
     {
@@ -71,7 +75,7 @@ const BG_FADE_MS = 8200;
 const MIN_INPUT_HEIGHT = 52;
 const MAX_INPUT_HEIGHT = 190;
 const TITLE_MAIN = 'SONIYA';
-const TITLE_PRO = 'PRO';
+const TITLE_PRO = 'Agent';
 const AVATAR_IDLE_DELAY_MS = 13000;
 const AVATAR_IDLE_ROTATE_MIN_MS = 15000;
 const AVATAR_IDLE_ROTATE_MAX_MS = 20000;
@@ -202,7 +206,8 @@ function AppContent() {
     const sendPulse = useRef(new Animated.Value(0)).current;
     const bgFade = useRef(new Animated.Value(0)).current;
     const bgDrift = useRef(new Animated.Value(0)).current;
-    const titlePhase = useRef(new Animated.Value(0)).current;
+    const titleColorPhase = useRef(new Animated.Value(0)).current;
+    const titleMotionPhase = useRef(new Animated.Value(0)).current;
     const titleGlow = useRef(new Animated.Value(0)).current;
 
     const wakeRestartTimerRef = useRef(null);
@@ -228,6 +233,7 @@ function AppContent() {
     const sparkleSway = useRef(new Animated.Value(0)).current;
     const balloonSway = useRef(new Animated.Value(0)).current;
     const decorPulse = useRef(new Animated.Value(0)).current;
+    const speechRecognitionAvailable = useMemo(() => isSpeechRecognitionAvailable(), []);
 
     const adjustVoiceRate = useCallback((delta) => {
         setVoiceRate((prev) => Number(clamp(prev + delta, 0.6, 1.4).toFixed(2)));
@@ -498,12 +504,12 @@ function AppContent() {
     }, [avatarActivity, autoAvatarMode, scheduleAvatarIdleCycle, clearAvatarIdleTimers, switchAvatarToChat, switchBackgroundScene, cycleAvatarStyle, cycleAvatarActivity]);
 
     const titleColorAt = useCallback((offset) => {
-        const shifted = Animated.modulo(Animated.add(titlePhase, offset), 1);
+        const shifted = Animated.modulo(Animated.add(titleColorPhase, offset), 1);
         return shifted.interpolate({
             inputRange: [0, 0.2, 0.4, 0.6, 0.8, 1],
             outputRange: TITLE_COLOR_STOPS
         });
-    }, [titlePhase]);
+    }, [titleColorPhase]);
 
     const decorateResponseForDisplay = useCallback((text, moodHint = 'HAPPY') => {
         const clean = String(text || '').trim();
@@ -668,12 +674,20 @@ function AppContent() {
     }, [showSettings, hydrateVoiceSettings]);
 
     useEffect(() => {
-        titlePhase.setValue(0);
+        titleColorPhase.setValue(0);
+        titleMotionPhase.setValue(0);
         const colorLoop = Animated.loop(
-            Animated.timing(titlePhase, {
+            Animated.timing(titleColorPhase, {
                 toValue: 1,
                 duration: 6200,
                 useNativeDriver: false
+            })
+        );
+        const motionLoop = Animated.loop(
+            Animated.timing(titleMotionPhase, {
+                toValue: 1,
+                duration: 6200,
+                useNativeDriver: true
             })
         );
         const glowLoop = Animated.loop(
@@ -684,12 +698,14 @@ function AppContent() {
         );
 
         colorLoop.start();
+        motionLoop.start();
         glowLoop.start();
         return () => {
             colorLoop.stop();
+            motionLoop.stop();
             glowLoop.stop();
         };
-    }, [titlePhase, titleGlow]);
+    }, [titleColorPhase, titleMotionPhase, titleGlow]);
 
     useEffect(() => {
         const loop = Animated.loop(
@@ -771,6 +787,12 @@ function AppContent() {
         }
     }, [autoEnableOnCharging, isCharging]);
 
+    useEffect(() => {
+        if (!speechRecognitionAvailable && alwaysListenEnabled) {
+            setAlwaysListenEnabled(false);
+        }
+    }, [speechRecognitionAvailable, alwaysListenEnabled]);
+
     const extractTranscript = (event) => {
         const results = event?.results;
         if (Array.isArray(results) && results.length > 0) {
@@ -808,6 +830,12 @@ function AppContent() {
     }, []);
 
     const startWakeListening = useCallback(async () => {
+        if (!speechRecognitionAvailable) {
+            autoListenModeRef.current = 'idle';
+            setIsWakeListening(false);
+            return;
+        }
+
         if (!alwaysListenEnabled || appState !== 'active' || isSpeakingRef.current || isThinkingRef.current || isManualListeningRef.current) {
             return;
         }
@@ -839,7 +867,7 @@ function AppContent() {
         }
 
         setIsWakeListening(false);
-    }, [alwaysListenEnabled, appState]);
+    }, [speechRecognitionAvailable, alwaysListenEnabled, appState]);
 
     useEffect(() => {
         if (alwaysListenEnabled && appState === 'active') {
@@ -915,6 +943,14 @@ function AppContent() {
         return () => {
             if (wakeRestartTimerRef.current) {
                 clearTimeout(wakeRestartTimerRef.current);
+            }
+
+            autoListenModeRef.current = 'idle';
+            wakeTranscriptRef.current = '';
+            try {
+                ExpoSpeechRecognitionModule.stop();
+            } catch (_err) {
+                // Ignore stop errors during teardown.
             }
         };
     }, []);
@@ -1219,13 +1255,13 @@ function AppContent() {
                                             }),
                                             transform: [
                                                 {
-                                                    translateX: titlePhase.interpolate({
+                                                    translateX: titleMotionPhase.interpolate({
                                                         inputRange: [0, 1],
                                                         outputRange: [-70, 70]
                                                     })
                                                 },
                                                 {
-                                                    rotate: titlePhase.interpolate({
+                                                    rotate: titleMotionPhase.interpolate({
                                                         inputRange: [0, 1],
                                                         outputRange: ['-9deg', '9deg']
                                                     })
@@ -1362,7 +1398,9 @@ function AppContent() {
                                         }}
                                     />
                                     <Text style={styles.wakeStatus}>
-                                        {alwaysListenEnabled
+                                        {!speechRecognitionAvailable
+                                            ? 'Speech recognition unavailable in this runtime'
+                                            : alwaysListenEnabled
                                             ? `Auto Listen ON (${wakeLang}) | ${isWakeListening ? 'Listening' : 'Waiting'}`
                                             : 'Wake mode OFF'}
                                     </Text>
@@ -1528,10 +1566,19 @@ function AppContent() {
                                         <View style={[styles.iconCircle, { backgroundColor: '#22c55e' }]}><Ionicons name="mic" size={18} color="#fff" /></View>
                                         <View>
                                             <Text style={styles.settingLabel}>Always Listen</Text>
-                                            <Text style={styles.settingDesc}>Continuous quick capture and instant reply</Text>
+                                            <Text style={styles.settingDesc}>
+                                                {speechRecognitionAvailable
+                                                    ? 'Continuous quick capture and instant reply'
+                                                    : 'Speech runtime unavailable (use a dev build)'}
+                                            </Text>
                                         </View>
                                     </View>
-                                    <Switch value={alwaysListenEnabled} onValueChange={setAlwaysListenEnabled} trackColor={{ false: '#333', true: '#22c55e' }} />
+                                    <Switch
+                                        value={alwaysListenEnabled}
+                                        onValueChange={setAlwaysListenEnabled}
+                                        trackColor={{ false: '#333', true: '#22c55e' }}
+                                        disabled={!speechRecognitionAvailable}
+                                    />
                                 </View>
 
                                 <View style={styles.settingItem}>
@@ -1710,7 +1757,7 @@ const styles = StyleSheet.create({
         width: 26,
         height: 26,
         borderRadius: 13,
-        marginRight: 8,
+        marginRight: 5,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.22)',
@@ -1719,10 +1766,10 @@ const styles = StyleSheet.create({
         alignItems: 'center'
     },
     companyLogoImage: { width: '100%', height: '100%' },
-    statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#4ade80', marginRight: 8, shadowColor: '#4ade80', shadowRadius: 5, shadowOpacity: 0.8 },
+    statusDot: { width: 6, height: 3, borderRadius: 2, backgroundColor: '#4ade80', marginRight: 4, shadowColor: '#4ade80', shadowRadius: 5, shadowOpacity: 0.8 },
     brand: {
         color: 'rgba(255,255,255,0.93)',
-        fontSize: 13,
+        fontSize: 9,
         letterSpacing: 0.8,
         fontWeight: '900',
         textShadowColor: 'rgba(0,0,0,0.45)',
@@ -1734,9 +1781,9 @@ const styles = StyleSheet.create({
     appNameWrap: {
         alignSelf: 'flex-start',
         marginTop: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 9,
-        borderRadius: 20,
+        paddingHorizontal: 12,
+        paddingVertical: 2,
+        borderRadius: 14,
         overflow: 'hidden',
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.2)',
@@ -1757,17 +1804,17 @@ const styles = StyleSheet.create({
     appNameRow: { flexDirection: 'row', alignItems: 'center' },
     appNameWord: { flexDirection: 'row', alignItems: 'center' },
     appNameLetter: {
-        fontSize: 38,
+        fontSize: 30,
         fontWeight: '900',
-        letterSpacing: 1.6,
+        letterSpacing: 1.2,
         textShadowColor: 'rgba(2, 8, 20, 0.55)',
         textShadowOffset: { width: 0, height: 2 },
         textShadowRadius: 5
     },
     proPill: {
-        marginLeft: 10,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
+        marginLeft: 4,
+        paddingHorizontal: 7,
+        paddingVertical: 3,
         borderRadius: 999,
         borderWidth: 1,
         borderColor: 'rgba(255,255,255,0.26)',
@@ -1780,9 +1827,9 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.28
     },
     proLetter: {
-        fontSize: 15,
+        fontSize: 12,
         fontWeight: '900',
-        letterSpacing: 1.1
+        letterSpacing: 0.9
     },
     stageArea: { flex: 1, justifyContent: 'flex-end' },
     avatarLayer: { ...StyleSheet.absoluteFillObject, zIndex: 2, justifyContent: 'flex-end' },

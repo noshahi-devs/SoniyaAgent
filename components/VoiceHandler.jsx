@@ -1,7 +1,11 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from 'expo-speech-recognition';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+    ExpoSpeechRecognitionModule,
+    isSpeechRecognitionAvailable,
+    useSpeechRecognitionEvent
+} from '../utils/speechRecognitionSafe';
 
 const VoiceHandler = ({ onSpeechResult, disabled = false, onListenStart, onListenEnd }) => {
     const AUTO_SILENCE_MS = 1200;
@@ -18,6 +22,17 @@ const VoiceHandler = ({ onSpeechResult, disabled = false, onListenStart, onListe
     const stopTimeoutRef = useRef(null);
     const silenceTimerRef = useRef(null);
     const maxListenTimerRef = useRef(null);
+    const hasShownUnavailableAlertRef = useRef(false);
+    const speechRecognitionAvailable = useMemo(() => isSpeechRecognitionAvailable(), []);
+
+    const notifyUnavailable = () => {
+        if (hasShownUnavailableAlertRef.current) return;
+        hasShownUnavailableAlertRef.current = true;
+        Alert.alert(
+            'Voice Unavailable',
+            'Speech recognition runtime ready nahi hai. Dev build/install ke baad dobara try karein.'
+        );
+    };
 
     useEffect(() => {
         isListeningRef.current = isListening;
@@ -49,6 +64,12 @@ const VoiceHandler = ({ onSpeechResult, disabled = false, onListenStart, onListe
             if (maxListenTimerRef.current) {
                 clearTimeout(maxListenTimerRef.current);
                 maxListenTimerRef.current = null;
+            }
+
+            try {
+                ExpoSpeechRecognitionModule.stop();
+            } catch (_err) {
+                // Ignore cleanup stop failures.
             }
         };
     }, []);
@@ -137,6 +158,11 @@ const VoiceHandler = ({ onSpeechResult, disabled = false, onListenStart, onListe
     });
 
     const requestPermissionAndStart = async () => {
+        if (!speechRecognitionAvailable) {
+            notifyUnavailable();
+            return false;
+        }
+
         const permission = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
         if (!permission.granted) {
             Alert.alert('Permission Required', 'Soniya ko mic ki zaroorat hai. Please allow microphone access.');
@@ -171,6 +197,10 @@ const VoiceHandler = ({ onSpeechResult, disabled = false, onListenStart, onListe
 
     const startListening = async () => {
         if (disabled || isListeningRef.current || startInProgressRef.current) return;
+        if (!speechRecognitionAvailable) {
+            notifyUnavailable();
+            return;
+        }
 
         startInProgressRef.current = true;
         stopRequestedRef.current = false;
@@ -246,7 +276,9 @@ const VoiceHandler = ({ onSpeechResult, disabled = false, onListenStart, onListe
                 >
                     <LinearGradient
                         colors={
-                            disabled
+                            !speechRecognitionAvailable
+                                ? ['#475569', '#334155']
+                                : disabled
                                 ? ['#64748b', '#475569']
                                 : isListening
                                     ? ['#ff1493', '#e0004a']
@@ -255,8 +287,10 @@ const VoiceHandler = ({ onSpeechResult, disabled = false, onListenStart, onListe
                         style={styles.btn}
                     >
                         <Text style={styles.btnText}>
-                            {disabled
-                                ? 'PLEASE WAIT'
+                            {!speechRecognitionAvailable
+                                ? 'VOICE UNAVAILABLE'
+                                : disabled
+                                    ? 'PLEASE WAIT'
                                 : isListening
                                     ? `LISTENING... AUTO SEND (${recognitionLangRef.current})`
                                     : 'TAP TO SPEAK'}

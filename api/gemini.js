@@ -25,9 +25,9 @@ const OPENROUTER_BASE_URL = process.env.EXPO_PUBLIC_OPENROUTER_BASE_URL || 'http
 const OPENROUTER_APP_NAME = process.env.EXPO_PUBLIC_OPENROUTER_APP_NAME || 'SoniyaAgent';
 const OPENROUTER_HTTP_REFERER = process.env.EXPO_PUBLIC_OPENROUTER_HTTP_REFERER;
 const OPENROUTER_MODELS = [...new Set([
+  process.env.EXPO_PUBLIC_OPENROUTER_MODEL,
   'qwen/qwen3.5-flash-02-23',
   'google/gemini-3-flash-preview',
-  process.env.EXPO_PUBLIC_OPENROUTER_MODEL
 ].filter(Boolean))];
 
 const getProviderChain = () => {
@@ -67,18 +67,75 @@ const SYSTEM_PROMPT = [
 ].join(' ');
 
 const MIN_REQUEST_INTERVAL_MS = 450;
-const REQUEST_TIMEOUT_MS = 14000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 14000;
+const OPENROUTER_REQUEST_TIMEOUT_MS = 18000;
+const SECURE_PROXY_TIMEOUT_MS = 7000;
+const MAX_MODEL_ATTEMPTS = 2;
+const MODEL_TIMEOUT_COOLDOWN_MS = 120000;
+const RETRYABLE_HTTP_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+const timedOutModelCooldown = new Map();
 let lastRequestAt = 0;
 let inFlight = false;
 
-const requestWithTimeout = async (url, options = {}, timeoutMs = REQUEST_TIMEOUT_MS) => {
+const requestWithTimeout = async (url, options = {}, timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      const timeoutError = new Error(`Request timed out after ${timeoutMs}ms`);
+      timeoutError.status = 504;
+      timeoutError.isTimeout = true;
+      throw timeoutError;
+    }
+    throw error;
   } finally {
     clearTimeout(timeoutId);
   }
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const parseJsonSafe = async (response) => {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch (_err) {
+    return { raw: text };
+  }
+};
+
+const isPreviewModel = (model = '') => String(model).toLowerCase().includes('preview');
+
+const getRequestTimeoutMs = (providerName, model) => {
+  if (providerName === 'OpenRouter' && isPreviewModel(model)) {
+    return OPENROUTER_REQUEST_TIMEOUT_MS;
+  }
+  return DEFAULT_REQUEST_TIMEOUT_MS;
+};
+
+const getRetryBackoffMs = (attempt) => 450 * attempt;
+
+const isRetryableStatus = (status) => RETRYABLE_HTTP_STATUS.has(Number(status || 0));
+
+const getModelCooldownKey = (providerName, model) => `${providerName}:${model}`;
+
+const isModelOnCooldown = (providerName, model) => {
+  const key = getModelCooldownKey(providerName, model);
+  const until = timedOutModelCooldown.get(key);
+  if (!until) return false;
+  if (Date.now() > until) {
+    timedOutModelCooldown.delete(key);
+    return false;
+  }
+  return true;
+};
+
+const setModelCooldown = (providerName, model) => {
+  const key = getModelCooldownKey(providerName, model);
+  timedOutModelCooldown.set(key, Date.now() + MODEL_TIMEOUT_COOLDOWN_MS);
 };
 
 const localFallbackReply = (userText = '') => {
@@ -155,11 +212,11 @@ const requestViaSecureProxy = async (userText) => {
       temperature: 0.55,
       max_tokens: 64
     })
-  });
+  }, SECURE_PROXY_TIMEOUT_MS);
 
-  const payload = await response.json();
+  const payload = await parseJsonSafe(response);
   if (!response.ok) {
-    const message = payload?.error?.message || `Proxy HTTP ${response.status}`;
+    const message = payload?.error?.message || payload?.raw || `Proxy HTTP ${response.status}`;
     const error = new Error(message);
     error.status = response.status;
     throw error;
@@ -233,7 +290,12 @@ export const askSoniya = async (userText) => {
 
   for (const provider of providers) {
     for (const key of provider.keys) {
+      let moveToNextKey = false;
       for (const model of provider.models) {
+        if (isModelOnCooldown(provider.name, model)) {
+          continue;
+        }
+
         const headers = {
           'Authorization': `Bearer ${key}`,
           'Content-Type': 'application/json'
@@ -254,61 +316,94 @@ export const askSoniya = async (userText) => {
           requestBody.top_p = 0.9;
         }
 
-        try {
-          const response = await requestWithTimeout(`${provider.baseUrl}/chat/completions`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(requestBody)
-          });
+        for (let attempt = 1; attempt <= MAX_MODEL_ATTEMPTS; attempt += 1) {
+          try {
+            const response = await requestWithTimeout(`${provider.baseUrl}/chat/completions`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify(requestBody)
+            }, getRequestTimeoutMs(provider.name, model));
 
-          const result = await response.json();
-          const fullText = extractAssistantText(result?.choices?.[0]?.message?.content);
+            const result = await parseJsonSafe(response);
+            const fullText = extractAssistantText(result?.choices?.[0]?.message?.content);
 
-          if (response.ok && fullText) {
-            const moodMatch = fullText.match(/\[(.*?)\]/);
-            const mood = moodMatch ? moodMatch[1].toUpperCase() : 'HAPPY';
-            const cleanText = fullText
-              .replace(/\[.*?\]/g, '')
-              .replace(/\*\*(.*?)\*\*/g, '$1')
-              .replace(/^(\s*(urdu script|roman urdu|roman|punjabi|english)\s*:)/gim, '')
-              .trim();
+            if (response.ok && fullText) {
+              const moodMatch = fullText.match(/\[(.*?)\]/);
+              const mood = moodMatch ? moodMatch[1].toUpperCase() : 'HAPPY';
+              const cleanText = fullText
+                .replace(/\[.*?\]/g, '')
+                .replace(/\*\*(.*?)\*\*/g, '$1')
+                .replace(/^(\s*(urdu script|roman urdu|roman|punjabi|english)\s*:)/gim, '')
+                .trim();
 
-            chatHistory.push(
-              { role: 'user', content: userText },
-              { role: 'assistant', content: cleanText }
-            );
-            if (chatHistory.length > 20) {
-              chatHistory = chatHistory.slice(-20);
+              chatHistory.push(
+                { role: 'user', content: userText },
+                { role: 'assistant', content: cleanText }
+              );
+              if (chatHistory.length > 20) {
+                chatHistory = chatHistory.slice(-20);
+              }
+
+              inFlight = false;
+              return { text: cleanText, mood };
             }
 
-            inFlight = false;
-            return { text: cleanText, mood };
-          }
+            if (response.ok && !fullText) {
+              lastStatus = 502;
+              lastErrorMessage = `Empty response from ${provider.name} model ${model}.`;
+              if (attempt < MAX_MODEL_ATTEMPTS && !isPreviewModel(model)) {
+                await sleep(getRetryBackoffMs(attempt));
+                continue;
+              }
+              break;
+            }
 
-          if (response.ok && !fullText) {
-            lastStatus = 502;
-            lastErrorMessage = `Empty response from ${provider.name} model ${model}.`;
-            continue;
-          }
+            lastStatus = response.status;
+            lastErrorMessage = result?.error?.message || result?.raw || `HTTP ${response.status}`;
 
-          lastStatus = response.status;
-          lastErrorMessage = result?.error?.message || `HTTP ${response.status}`;
+            // Model not found -> try next model.
+            if (response.status === 404) {
+              break;
+            }
 
-          // Try next fallback model on not-found.
-          if (response.status === 404) {
-            continue;
-          }
-          // Auth/quota errors: try next key.
-          if (response.status === 401 || response.status === 403 || response.status === 429 || response.status === 402) {
+            // Auth/quota/rate errors -> rotate key.
+            if (response.status === 401 || response.status === 403 || response.status === 402 || response.status === 429) {
+              moveToNextKey = true;
+              break;
+            }
+
+            if (isRetryableStatus(response.status) && attempt < MAX_MODEL_ATTEMPTS && !isPreviewModel(model)) {
+              await sleep(getRetryBackoffMs(attempt));
+              continue;
+            }
+
+            break;
+          } catch (error) {
+            if (error?.isTimeout || error?.name === 'AbortError') {
+              lastStatus = 504;
+              lastErrorMessage = `${provider.name} ${model} timed out`;
+              setModelCooldown(provider.name, model);
+
+              if (attempt < MAX_MODEL_ATTEMPTS && !isPreviewModel(model)) {
+                await sleep(getRetryBackoffMs(attempt));
+                continue;
+              }
+              break;
+            }
+
+            lastStatus = error?.status || 503;
+            lastErrorMessage = error?.message || 'Network request failed';
+
+            if (attempt < MAX_MODEL_ATTEMPTS && !isPreviewModel(model)) {
+              await sleep(getRetryBackoffMs(attempt));
+              continue;
+            }
             break;
           }
-        } catch (error) {
-          if (error?.name === 'AbortError') {
-            lastStatus = 504;
-            lastErrorMessage = `${provider.name} ${model} timed out`;
-            continue;
-          }
-          lastErrorMessage = error?.message || 'Network request failed';
+        }
+
+        if (moveToNextKey) {
+          break;
         }
       }
     }
@@ -316,7 +411,7 @@ export const askSoniya = async (userText) => {
 
   console.error('Provider request failed:', { status: lastStatus, message: lastErrorMessage });
 
-  if (lastStatus === 401 || lastStatus === 403) {
+  if (lastStatus === 401 || lastStatus === 403 || lastStatus === 504) {
     inFlight = false;
     return localFallbackReply(userText);
   }
