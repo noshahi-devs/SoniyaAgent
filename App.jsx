@@ -70,15 +70,21 @@ const MOOD_OPTIONS = ['Happy', 'Sad', 'Serious', 'Lovely', 'Romantic', 'Calm', '
 const SETTINGS_STORAGE_KEY = '@soniya_ui_settings_v1';
 const DEFAULT_PERSONA_MOOD = 'Romantic';
 const DEFAULT_VOICE_RATE = 1.0;
-const BG_SWITCH_MS = 17000;
-const BG_FADE_MS = 8200;
+const DEFAULT_VOICE_HANDLER_VARIANT = 'COMPACT';
+const VOICE_HANDLER_VARIANTS = ['COMPACT', 'AI'];
+const VOICE_HANDLER_LABELS = {
+    COMPACT: 'Mini',
+    AI: 'AI Panel'
+};
+const BG_SWITCH_MS = 45000;
+const BG_FADE_MS = 6200;
 const MIN_INPUT_HEIGHT = 52;
 const MAX_INPUT_HEIGHT = 190;
 const TITLE_MAIN = 'SONIYA';
 const TITLE_PRO = 'Agent';
-const AVATAR_IDLE_DELAY_MS = 13000;
-const AVATAR_IDLE_ROTATE_MIN_MS = 15000;
-const AVATAR_IDLE_ROTATE_MAX_MS = 20000;
+const AVATAR_IDLE_DELAY_MS = 12000;
+const AVATAR_IDLE_ROTATE_MIN_MS = 32000;
+const AVATAR_IDLE_ROTATE_MAX_MS = 42000;
 const AVATAR_STYLE_VARIANTS = ['CLASSIC', 'ELEGANT', 'CASUAL', 'OFFICE'];
 const AVATAR_STYLE_LABELS = {
     CLASSIC: 'Classic look on hai.',
@@ -197,6 +203,7 @@ function AppContent() {
     const [voiceRate, setVoiceRate] = useState(DEFAULT_VOICE_RATE);
     const [voiceOptions, setVoiceOptions] = useState([]);
     const [selectedVoiceId, setSelectedVoiceId] = useState('');
+    const [voiceHandlerVariant, setVoiceHandlerVariant] = useState(DEFAULT_VOICE_HANDLER_VARIANT);
     const [userInputText, setUserInputText] = useState('');
     const [inputHeight, setInputHeight] = useState(MIN_INPUT_HEIGHT);
     const [bgCurrentIndex, setBgCurrentIndex] = useState(0);
@@ -282,7 +289,6 @@ function AppContent() {
 
     const startAvatarIdleCycle = useCallback(() => {
         if (isSpeakingRef.current || isThinkingRef.current) return;
-        runAvatarIdleStep();
         const scheduleNext = () => {
             if (avatarIdleRotateTimerRef.current) {
                 clearTimeout(avatarIdleRotateTimerRef.current);
@@ -338,7 +344,7 @@ function AppContent() {
         bgFade.stopAnimation();
         Animated.timing(bgFade, {
             toValue: 1,
-            duration: 1700,
+            duration: BG_FADE_MS,
             useNativeDriver: true
         }).start(({ finished }) => {
             if (!finished) return;
@@ -403,7 +409,7 @@ function AppContent() {
             return {
                 handled: true,
                 mood: 'HAPPY',
-                text: 'Auto mode ON kar diya hai, ab main khud 15-20 second me pose switch karti rahungi.'
+                text: 'Auto mode ON kar diya hai, ab main soft transition ke sath thori dair baad pose switch karti rahungi.'
             };
         }
 
@@ -544,6 +550,7 @@ function AppContent() {
         if (stored.voiceResponse !== undefined) setVoiceResponse(stored.voiceResponse);
         if (stored.alwaysListenEnabled !== undefined) setAlwaysListenEnabled(stored.alwaysListenEnabled);
         if (stored.autoAvatarMode !== undefined) setAutoAvatarMode(stored.autoAvatarMode);
+        if (stored.voiceHandlerVariant !== undefined) setVoiceHandlerVariant(stored.voiceHandlerVariant);
     }, []);
 
     const persistedUiSettings = useMemo(() => ({
@@ -552,8 +559,9 @@ function AppContent() {
         selectedVoiceId,
         voiceResponse,
         alwaysListenEnabled,
-        autoAvatarMode
-    }), [personaMood, voiceRate, selectedVoiceId, voiceResponse, alwaysListenEnabled, autoAvatarMode]);
+        autoAvatarMode,
+        voiceHandlerVariant
+    }), [personaMood, voiceRate, selectedVoiceId, voiceResponse, alwaysListenEnabled, autoAvatarMode, voiceHandlerVariant]);
 
     const manualCommands = useMemo(
         () => USER_MANUAL_COMMANDS[manualLang] || USER_MANUAL_COMMANDS.EN,
@@ -575,8 +583,8 @@ function AppContent() {
         `Soniya: ${userName}, main pyar se guide karungi, bas bolo.`,
         'Soniya: Hello Jaani, main yahan hoon aap ke liye, kya chal raha hai?',
         `Soniya: ${userName}, aap ki awaz sun ke accha lag raha hai, kya baat karni hai?`,
-        'Jaani ooyee',
-        'Mrshadoo gal te sunoon',
+        'Jaani ooyee....',
+        'Mrshadoo gal te sunoon....',
     ], [userName]);
 
     useEffect(() => {
@@ -1387,6 +1395,7 @@ function AppContent() {
                                     <VoiceHandler
                                         onSpeechResult={handleUserSpeech}
                                         disabled={isThinking || isSpeaking}
+                                        variant={voiceHandlerVariant}
                                         onListenStart={() => {
                                             isManualListeningRef.current = true;
                                             if (alwaysListenEnabled) {
@@ -1520,7 +1529,7 @@ function AppContent() {
                                         <View style={[styles.iconCircle, { backgroundColor: '#fb7185' }]}><Ionicons name="mic-circle" size={18} color="#fff" /></View>
                                         <View>
                                             <Text style={styles.settingLabel}>Voice Style</Text>
-                                            <Text style={styles.settingDesc}>Young feminine voice options</Text>
+                                            <Text style={styles.settingDesc}>Female assistant tone presets</Text>
                                         </View>
                                     </View>
                                     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.voiceChipRow}>
@@ -1538,6 +1547,29 @@ function AppContent() {
                                         ))}
                                         {!voiceOptions.length && <Text style={styles.voiceEmptyText}>No voice options found on this device.</Text>}
                                     </ScrollView>
+                                </View>
+
+                                <View style={styles.settingItem}>
+                                    <View style={styles.settingTextGroup}>
+                                        <View style={[styles.iconCircle, { backgroundColor: '#7c3aed' }]}><Ionicons name="sparkles" size={18} color="#fff" /></View>
+                                        <View>
+                                            <Text style={styles.settingLabel}>Voice Button Style</Text>
+                                            <Text style={styles.settingDesc}>Default mini button ya optional AI panel</Text>
+                                        </View>
+                                    </View>
+                                    <View style={styles.viewToggle}>
+                                        {VOICE_HANDLER_VARIANTS.map((variant) => (
+                                            <TouchableOpacity
+                                                key={variant}
+                                                onPress={() => setVoiceHandlerVariant(variant)}
+                                                style={[styles.miniToggle, voiceHandlerVariant === variant && styles.miniToggleActive]}
+                                            >
+                                                <Text style={[styles.miniToggleText, voiceHandlerVariant === variant && styles.miniToggleTextActive]}>
+                                                    {VOICE_HANDLER_LABELS[variant]}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
                                 </View>
 
                                 <View style={styles.settingItemColumn}>

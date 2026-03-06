@@ -4,6 +4,54 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Image, StyleSheet, Text, View } from 'react-native';
 
 const BASE_BOTTOM_GAP = 0;
+const AVATAR_FADE_MS = 5000;
+const AVATAR_IMAGE_ASPECT_RATIO = 1024 / 1536;
+const FULL_SOURCE = require('../assets/images/soniya_full.png');
+const HALF_SOURCE = require('../assets/images/soniya_half.png');
+const CLOSEUP_SOURCE = require('../assets/images/soniya_closeup.png');
+const MOUTH_SMALL_SOURCE = require('../assets/images/soniya_mouth_open_small.png');
+const MOUTH_LARGE_SOURCE = require('../assets/images/soniya_mouth_open_large.png');
+const TALKING_DRESS_SOURCE = require('../assets/images/soniya_pose_talking_dress_change.png');
+const NABEEL_SOURCE = require('../assets/images/soniya_pose_nabeel.png');
+const PHONE_SOURCE = require('../assets/images/soniya_pose_phone.png');
+const PHONE_ALT_1_SOURCE = require('../assets/images/1 soniya_pose_phone.png');
+const PHONE_ALT_2_SOURCE = require('../assets/images/2 soniya_pose_phone.png');
+const READING_SOURCE = require('../assets/images/soniya_pose_reading.png');
+const READING_ALT_1_SOURCE = require('../assets/images/1 soniya_pose_reading.png');
+const READING_ALT_2_SOURCE = require('../assets/images/2 soniya_pose_reading.png');
+const RELAX_SOURCE = require('../assets/images/soniya_pose_relax.png');
+const RELAX_ALT_1_SOURCE = require('../assets/images/1 soniya_pose_relax.png');
+const SLEEP_SOURCE = require('../assets/images/soniya_pose_sleep.png');
+const OFFICE_SOURCE = require('../assets/images/soniya_pose_office.png');
+const LAPTOP_SOURCE = require('../assets/images/soniya_pose_laptop.png');
+const AVATAR_SOURCES = {
+    FULL: FULL_SOURCE,
+    HALF: HALF_SOURCE,
+    CLOSEUP: CLOSEUP_SOURCE,
+    MOUTH_SMALL: MOUTH_SMALL_SOURCE,
+    MOUTH_LARGE: MOUTH_LARGE_SOURCE
+};
+const DEFAULT_AVATAR_SCALE = 1.08;
+const AVATAR_SOURCE_SCALES = new Map([
+    [FULL_SOURCE, 1.08],
+    [HALF_SOURCE, 1.08],
+    [CLOSEUP_SOURCE, 1.08],
+    [MOUTH_SMALL_SOURCE, 1.08],
+    [MOUTH_LARGE_SOURCE, 1.08],
+    [TALKING_DRESS_SOURCE, 1.02],
+    [NABEEL_SOURCE, 1.22],
+    [PHONE_SOURCE, 1.08],
+    [PHONE_ALT_1_SOURCE, 1.10],
+    [PHONE_ALT_2_SOURCE, 1.12],
+    [READING_SOURCE, 1.08],
+    [READING_ALT_1_SOURCE, 1.08],
+    [READING_ALT_2_SOURCE, 1.10],
+    [RELAX_SOURCE, 1.20],
+    [RELAX_ALT_1_SOURCE, 1.22],
+    [SLEEP_SOURCE, 1.22],
+    [OFFICE_SOURCE, 1.08],
+    [LAPTOP_SOURCE, 1.22]
+]);
 
 const STYLE_VARIANTS = {
     CLASSIC: {
@@ -49,36 +97,69 @@ const ACTIVITY_META = {
     OFFICE: { label: 'Working', icon: 'laptop-outline' }
 };
 
-const POSE_SWITCH_MIN_MS = 15000;
-const POSE_SWITCH_MAX_MS = 20000;
+const POSE_SWITCH_MIN_MS = 30000;
+const POSE_SWITCH_MAX_MS = 38000;
 const ACTIVITY_POSE_POOLS = {
     CHAT: [
-        require('../assets/images/soniya_full.png'),
-        require('../assets/images/soniya_pose_talking_dress_change.png'),
-        require('../assets/images/soniya_pose_nabeel.png')
+        AVATAR_SOURCES.FULL,
+        TALKING_DRESS_SOURCE,
+        NABEEL_SOURCE
     ],
     PHONE: [
-        require('../assets/images/soniya_pose_phone.png'),
-        require('../assets/images/1 soniya_pose_phone.png'),
-        require('../assets/images/2 soniya_pose_phone.png')
+        PHONE_SOURCE,
+        PHONE_ALT_1_SOURCE,
+        PHONE_ALT_2_SOURCE
     ],
     READING: [
-        require('../assets/images/soniya_pose_reading.png'),
-        require('../assets/images/1 soniya_pose_reading.png'),
-        require('../assets/images/2 soniya_pose_reading.png')
+        READING_SOURCE,
+        READING_ALT_1_SOURCE,
+        READING_ALT_2_SOURCE
     ],
     RELAX: [
-        require('../assets/images/soniya_pose_relax.png'),
-        require('../assets/images/1 soniya_pose_relax.png')
+        RELAX_SOURCE,
+        RELAX_ALT_1_SOURCE
     ],
     SLEEP: [
-        require('../assets/images/soniya_pose_sleep.png')
+        SLEEP_SOURCE
     ],
     OFFICE: [
-        require('../assets/images/soniya_pose_office.png'),
-        require('../assets/images/soniya_pose_laptop.png')
+        OFFICE_SOURCE,
+        LAPTOP_SOURCE
     ]
 };
+
+const pickNextPoseIndex = (itemsLength, previousIndex = 0) => {
+    if (itemsLength <= 1) return 0;
+
+    const safePrevious = Number.isInteger(previousIndex) ? previousIndex : 0;
+    let next = Math.floor(Math.random() * itemsLength);
+    if (next === safePrevious) {
+        next = (next + 1) % itemsLength;
+    }
+    return next;
+};
+
+const resolveStaticAvatarSource = (viewType, posePool, poseVariantIndex) => {
+    if (viewType === 'HALF') return AVATAR_SOURCES.HALF;
+    if (viewType === 'CLOSEUP') return AVATAR_SOURCES.CLOSEUP;
+
+    if (posePool.length) {
+        const idx = ((poseVariantIndex % posePool.length) + posePool.length) % posePool.length;
+        return posePool[idx];
+    }
+
+    return AVATAR_SOURCES.FULL;
+};
+
+const resolveSpeakingAvatarSource = (viewType, currentFrame) => {
+    if (viewType === 'HALF') return AVATAR_SOURCES.HALF;
+    if (viewType === 'CLOSEUP') return AVATAR_SOURCES.CLOSEUP;
+    if (currentFrame === 1) return AVATAR_SOURCES.MOUTH_SMALL;
+    if (currentFrame === 2) return AVATAR_SOURCES.MOUTH_LARGE;
+    return AVATAR_SOURCES.FULL;
+};
+
+const getAvatarScale = (source) => AVATAR_SOURCE_SCALES.get(source) || DEFAULT_AVATAR_SCALE;
 
 const SoniyaAvatar = ({
     mood,
@@ -93,13 +174,18 @@ const SoniyaAvatar = ({
     const floatAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(1)).current;
     const activityPulse = useRef(new Animated.Value(0)).current;
+    const avatarFade = useRef(new Animated.Value(0)).current;
     const idleFloatLoopRef = useRef(null);
     const speakPulseLoopRef = useRef(null);
     const activityPulseLoopRef = useRef(null);
     const poseSwitchTimerRef = useRef(null);
+    const displaySourceRef = useRef(AVATAR_SOURCES.FULL);
+    const incomingSourceRef = useRef(null);
 
     const [currentFrame, setCurrentFrame] = useState(0); // 0: closed, 1: small, 2: large
     const [poseVariantIndex, setPoseVariantIndex] = useState(0);
+    const [displaySource, setDisplaySource] = useState(AVATAR_SOURCES.FULL);
+    const [incomingSource, setIncomingSource] = useState(null);
     const lipsingInterval = useRef(null);
 
     const resolvedActivity = (isSpeaking || isThinking) ? 'CHAT' : (activityMode || 'CHAT');
@@ -140,10 +226,11 @@ const SoniyaAvatar = ({
             if (idleFloatLoopRef.current) idleFloatLoopRef.current.stop();
             if (activityPulseLoopRef.current) activityPulseLoopRef.current.stop();
             if (poseSwitchTimerRef.current) clearTimeout(poseSwitchTimerRef.current);
+            avatarFade.stopAnimation();
             stopSpeakPulse();
             if (lipsingInterval.current) clearInterval(lipsingInterval.current);
         };
-    }, [activityPulse, startIdleFloat]);
+    }, [activityPulse, avatarFade, startIdleFloat]);
 
     useEffect(() => {
         if (isSpeaking) {
@@ -176,10 +263,9 @@ const SoniyaAvatar = ({
     }, [isSpeaking, floatAnim, scaleAnim, startIdleFloat]);
 
     const viewConfig = {
-        // Negative yLift pushes avatar down so feet/body baseline touches screen bottom naturally.
-        FULL: { width: 420, height: 620, yLift: -30 },
-        HALF: { width: 455, height: 645, yLift: -54 },
-        CLOSEUP: { width: 560, height: 760, yLift: -72 }
+        FULL: { width: 450, height: 665, bottomOffset: 46 },
+        HALF: { width: 486, height: 690, bottomOffset: 68 },
+        CLOSEUP: { width: 596, height: 812, bottomOffset: 92 }
     };
     const activeView = viewConfig[viewType] || viewConfig.FULL;
     const bottomGap = viewType === 'CLOSEUP'
@@ -204,15 +290,7 @@ const SoniyaAvatar = ({
             return () => {};
         }
 
-        setPoseVariantIndex((prev) => {
-            if (posePool.length <= 1) return 0;
-            const safePrev = Number.isInteger(prev) ? prev : 0;
-            let next = Math.floor(Math.random() * posePool.length);
-            if (next === safePrev) {
-                next = (next + 1) % posePool.length;
-            }
-            return next;
-        });
+        setPoseVariantIndex(0);
 
         if (!autoModeEnabled || posePool.length <= 1) {
             return () => {};
@@ -221,15 +299,7 @@ const SoniyaAvatar = ({
         const scheduleNextPose = () => {
             const delay = POSE_SWITCH_MIN_MS + Math.floor(Math.random() * (POSE_SWITCH_MAX_MS - POSE_SWITCH_MIN_MS + 1));
             poseSwitchTimerRef.current = setTimeout(() => {
-                setPoseVariantIndex((prev) => {
-                    if (posePool.length <= 1) return 0;
-                    const safePrev = Number.isInteger(prev) ? prev : 0;
-                    let next = Math.floor(Math.random() * posePool.length);
-                    if (next === safePrev) {
-                        next = (next + 1) % posePool.length;
-                    }
-                    return next;
-                });
+                setPoseVariantIndex((prev) => pickNextPoseIndex(posePool.length, prev));
                 scheduleNextPose();
             }, delay);
         };
@@ -243,22 +313,51 @@ const SoniyaAvatar = ({
         };
     }, [posePool, autoModeEnabled]);
 
-    const avatarSource = useMemo(() => {
-        if (viewType === 'HALF') return require('../assets/images/soniya_half.png');
-        if (viewType === 'CLOSEUP') return require('../assets/images/soniya_closeup.png');
+    const staticAvatarSource = useMemo(
+        () => resolveStaticAvatarSource(viewType, posePool, poseVariantIndex),
+        [viewType, posePool, poseVariantIndex]
+    );
+    const speakingAvatarSource = useMemo(
+        () => resolveSpeakingAvatarSource(viewType, currentFrame),
+        [viewType, currentFrame]
+    );
 
+    useEffect(() => {
         if (isSpeaking) {
-            if (currentFrame === 1) return require('../assets/images/soniya_mouth_open_small.png');
-            if (currentFrame === 2) return require('../assets/images/soniya_mouth_open_large.png');
+            avatarFade.stopAnimation();
+            avatarFade.setValue(0);
+            incomingSourceRef.current = null;
+            setIncomingSource(null);
+            displaySourceRef.current = speakingAvatarSource;
+            setDisplaySource(speakingAvatarSource);
+            return;
         }
 
-        if (posePool.length) {
-            const idx = ((poseVariantIndex % posePool.length) + posePool.length) % posePool.length;
-            return posePool[idx];
+        const currentVisibleSource = incomingSourceRef.current ?? displaySourceRef.current;
+        if (currentVisibleSource === staticAvatarSource) {
+            return;
         }
 
-        return require('../assets/images/soniya_full.png');
-    }, [viewType, isSpeaking, currentFrame, posePool, poseVariantIndex]);
+        avatarFade.stopAnimation();
+        avatarFade.setValue(0);
+        displaySourceRef.current = currentVisibleSource;
+        setDisplaySource(currentVisibleSource);
+        incomingSourceRef.current = staticAvatarSource;
+        setIncomingSource(staticAvatarSource);
+
+        Animated.timing(avatarFade, {
+            toValue: 1,
+            duration: AVATAR_FADE_MS,
+            useNativeDriver: true
+        }).start(({ finished }) => {
+            if (!finished) return;
+            displaySourceRef.current = staticAvatarSource;
+            incomingSourceRef.current = null;
+            setDisplaySource(staticAvatarSource);
+            setIncomingSource(null);
+            avatarFade.setValue(0);
+        });
+    }, [avatarFade, isSpeaking, speakingAvatarSource, staticAvatarSource]);
 
     const activityBodyTransform = useMemo(() => {
         if (resolvedActivity === 'SLEEP') {
@@ -347,6 +446,51 @@ const SoniyaAvatar = ({
         return base;
     }, [resolvedActivity, moodAuraColor]);
 
+    const outgoingAvatarOpacity = incomingSource
+        ? avatarFade.interpolate({ inputRange: [0, 1], outputRange: [1, 0] })
+        : 1;
+    const outgoingTintOpacity = styleProfile.tintOpacity;
+    const incomingTintOpacity = styleProfile.tintOpacity;
+    const avatarFrameStyle = {
+        width: activeView.width,
+        height: activeView.height,
+        transform: [{ translateY: activeView.bottomOffset }]
+    };
+    const renderAvatarLayer = (source, opacity, tintOpacity, layerKey) => {
+        if (!source) return null;
+        const avatarScale = getAvatarScale(source);
+        const pinnedTranslateY = -((activeView.height * (avatarScale - 1)) / 2);
+
+        return (
+            <Animated.View key={layerKey} pointerEvents="none" style={[styles.characterLayer, { opacity }]}>
+                <View style={styles.characterSlot}>
+                    <View
+                        style={[
+                            styles.characterContent,
+                            {
+                                transform: [{ translateY: pinnedTranslateY }, { scale: avatarScale }]
+                            }
+                        ]}
+                    >
+                        <Image source={source} style={styles.character} resizeMode="contain" />
+                        <Animated.Image
+                            source={source}
+                            style={[
+                                styles.character,
+                                styles.tintLayer,
+                                {
+                                    tintColor: styleProfile.tintColor,
+                                    opacity: tintOpacity
+                                }
+                            ]}
+                            resizeMode="contain"
+                        />
+                    </View>
+                </View>
+            </Animated.View>
+        );
+    };
+
     return (
         <View style={styles.container}>
             <Animated.View style={[styles.anchor, { bottom: bottomGap, transform: [{ translateY: floatAnim }, { scale: scaleAnim }] }]}>
@@ -386,33 +530,10 @@ const SoniyaAvatar = ({
                         }
                     ]}
                 >
-                    <Image
-                        source={avatarSource}
-                        style={[
-                            styles.character,
-                            {
-                                width: activeView.width,
-                                height: activeView.height,
-                                marginBottom: activeView.yLift
-                            }
-                        ]}
-                        resizeMode="contain"
-                    />
-                    <Image
-                        source={avatarSource}
-                        style={[
-                            styles.character,
-                            styles.tintLayer,
-                            {
-                                width: activeView.width,
-                                height: activeView.height,
-                                marginBottom: activeView.yLift,
-                                tintColor: styleProfile.tintColor,
-                                opacity: styleProfile.tintOpacity
-                            }
-                        ]}
-                        resizeMode="contain"
-                    />
+                    <View style={[styles.characterFrame, avatarFrameStyle]}>
+                        {renderAvatarLayer(displaySource, outgoingAvatarOpacity, outgoingTintOpacity, 'current')}
+                        {incomingSource && renderAvatarLayer(incomingSource, avatarFade, incomingTintOpacity, 'next')}
+                    </View>
                 </Animated.View>
 
                 <Animated.View
@@ -565,16 +686,37 @@ const styles = StyleSheet.create({
     container: { flex: 1, justifyContent: 'flex-end', alignItems: 'center', width: '100%', overflow: 'visible' },
     anchor: { position: 'absolute', bottom: 0, alignItems: 'center' },
     characterWrap: {
+        width: '100%',
         alignItems: 'center',
         justifyContent: 'center',
         shadowOffset: { width: 0, height: 0 },
         shadowRadius: 18
     },
-    character: { width: 420, height: 620 },
+    characterFrame: {
+        position: 'relative',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        overflow: 'visible'
+    },
+    characterLayer: {
+        ...StyleSheet.absoluteFillObject,
+        alignItems: 'center',
+        justifyContent: 'flex-end'
+    },
+    characterSlot: {
+        position: 'relative',
+        height: '100%',
+        aspectRatio: AVATAR_IMAGE_ASPECT_RATIO,
+        alignItems: 'center',
+        justifyContent: 'flex-end'
+    },
+    characterContent: {
+        width: '100%',
+        height: '100%'
+    },
+    character: { width: '100%', height: '100%' },
     tintLayer: {
-        position: 'absolute',
-        top: 0,
-        left: 0
+        ...StyleSheet.absoluteFillObject
     },
     activityLight: {
         position: 'absolute'

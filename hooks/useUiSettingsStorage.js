@@ -24,7 +24,9 @@ export const useUiSettingsStorage = ({
           voiceRate: Number.isFinite(parsed.voiceRate) ? Number(clamp(parsed.voiceRate, 0.6, 1.4).toFixed(2)) : undefined,
           selectedVoiceId: typeof parsed.selectedVoiceId === 'string' ? parsed.selectedVoiceId : undefined,
           voiceResponse: typeof parsed.voiceResponse === 'boolean' ? parsed.voiceResponse : undefined,
-          alwaysListenEnabled: typeof parsed.alwaysListenEnabled === 'boolean' ? parsed.alwaysListenEnabled : undefined
+          alwaysListenEnabled: typeof parsed.alwaysListenEnabled === 'boolean' ? parsed.alwaysListenEnabled : undefined,
+          autoAvatarMode: typeof parsed.autoAvatarMode === 'boolean' ? parsed.autoAvatarMode : undefined,
+          voiceHandlerVariant: typeof parsed.voiceHandlerVariant === 'string' ? parsed.voiceHandlerVariant : undefined
         });
       } catch (_err) {
         // Ignore settings restore failures.
